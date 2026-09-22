@@ -22,9 +22,8 @@ An enterprise-grade, zero-trust geospatial middleware engineered for delivery, r
 8. [Database Schema & Stored Procedures](#database-schema--stored-procedures)
 9. [Continuous Integration & Delivery (CI/CD)](#continuous-integration--delivery-cicd)
 10. [Troubleshooting & Common Issues](#troubleshooting--common-issues)
-11. [Faculty Review Defense Q&A](#faculty-review-defense-qa)
-12. [Future Engineering Roadmap](#future-engineering-roadmap)
-13. [License & Maintainer](#license--maintainer)
+11. [Future Engineering Roadmap](#future-engineering-roadmap)
+12. [License & Maintainer](#license--maintainer)
 
 ---
 
