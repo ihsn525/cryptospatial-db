@@ -1,0 +1,74 @@
+name: CryptoSpatial-DB CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # --- STAGE 1: BACKEND CI ---
+  backend-ci:
+    name: FastAPI & Database Migration Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cryptosecretpassword99
+          POSTGRES_DB: cryptospatial_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Database Schema Migrations
+        env:
+          PGPASSWORD: cryptosecretpassword99
+        run: |
+          PGPASSWORD=cryptosecretpassword99 psql -h localhost -U postgres -d cryptospatial_db -f database/migrations/001_initial_schema.sql
+          PGPASSWORD=cryptosecretpassword99 psql -h localhost -U postgres -d cryptospatial_db -f database/migrations/002_update_procedure.sql
+
+  # --- STAGE 2: FRONTEND CI ---
+  frontend-ci:
+    name: React Vite Build & Lint Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build Production Frontend Assets
+        run: |
+          cd frontend
+          npm run build
