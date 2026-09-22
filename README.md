@@ -353,7 +353,6 @@ docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "C
 
 Distributed under the **MIT License**.
 
-- **Author:** Ihsan Siju
-- **GitHub:** [@ihsn525](https://github.com/ihsn525) 
-- **Collaborator(s):** Hanna Ann, Gowrika Menon
+- **Author(s):** Ihsan Siju, Hanna Ann, Gowrika Menon
+- **GitHub:** [@ihsn525](https://github.com/ihsn525) [@Hanna296-del](https://github.com/Hanna296-del) [@gowrika3](https://github.com/gowrika3)
 - **Project Repository:** [CryptoSpatial-DB on GitHub](https://github.com/ihsn525/cryptospatial-db)
