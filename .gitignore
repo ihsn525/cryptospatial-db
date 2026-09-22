@@ -1,10 +1,4 @@
-# Environment & Secrets
-.env
-*.env
-*.pem
-*.key
-
-# Python
+# Python / Virtual Environment
 venv/
 __pycache__/
 *.pyc
@@ -12,9 +6,17 @@ __pycache__/
 
 # Node / React
 node_modules/
-dist/
-build/
+frontend/dist/
+frontend/node_modules/
+.npm
 
-# Database & Docker
-postgres_data/
-backups/
+# Logs and Runtime Process IDs
+logs/
+.pids/
+*.log
+
+# Environment & IDE
+.env
+.vscode/
+.idea/
+.DS_Store
