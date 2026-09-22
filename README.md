@@ -1,4 +1,3 @@
-```markdown
 # CryptoSpatial-DB: Privacy-Preserving Geospatial Auditing Engine
 
 ![CI/CD Pipeline Status](https://img.shields.io/github/actions/workflow/status/ihsn525/cryptospatial-db/ci-cd.yml?branch=main&label=CI%2FCD%20Pipeline&style=for-the-badge&logo=github)
@@ -33,53 +32,50 @@ An enterprise-grade, zero-trust geospatial middleware engineered for delivery, r
 
 Logistics platforms ingest millions of location pings daily. Traditional database architectures store raw latitude/longitude points directly in spatial tables, introducing three major liabilities:
 
-1. **Surveillance & Trajectory Exposure:** Storing continuous $(Lat, Lon)$ points creates an immutable movement history. A database leak exposes exact home addresses, routines, and physical habits of drivers.
-2. **Database Throughput Degradation:** Performing point-in-polygon checks over raw streams during peak order windows leads to $O(N)$ scanning bottlenecks and database lock latency.
+1. **Surveillance & Trajectory Exposure:** Storing continuous (Lat, Lon) points creates an immutable movement history. A database leak exposes exact home addresses, routines, and physical habits of drivers.
+2. **Database Throughput Degradation:** Performing point-in-polygon checks over raw streams during peak order windows leads to O(N) scanning bottlenecks and database lock latency.
 3. **The Auditability Paradox:** Regulatory auditors and dispatch systems need aggregate counts of active drivers in a zone. However, returning exact counts allows adversaries to execute query differencing attacks to track individual driver entry and exit.
 
-**CryptoSpatial-DB** solves this by enforcing **Ingestion-Time Geohash Truncation** paired with **PostGIS-Level Differential Privacy ($\epsilon = 1.5$)**, delivering sub-second spatial containment reports with zero trajectory leakage.
+**CryptoSpatial-DB** solves this by enforcing **Ingestion-Time Geohash Truncation** paired with **PostGIS-Level Differential Privacy (ε = 1.5)**, delivering sub-second spatial containment reports with zero trajectory leakage.
 
 ---
 
 ## Key System Features
 
-* **Ingested Spatial Masking:** Converts GPS points into 7-character Base32 Geohashes ($\approx 153\text{m} \times 153\text{m}$ grid resolution) on ingestion, immediately discarding pinpoint street coordinates.
-* **PostGIS R-Tree (GiST) Spatial Indexing:** Leverages Generalized Search Trees over spatial MultiPolygons for $O(\log N)$ containment evaluations.
-* **$\epsilon$-Geo-Indistinguishability:** Stored PL/pgSQL procedures inject 2D Planar Laplace noise ($\epsilon = 1.5$) into aggregate queries, mathematically preventing trajectory reconstruction.
-* **Real-Time Control Dashboard:** Dark-themed React/Leaflet dashboard displaying active delivery geofences, driver markers, real-time audit output cards, and a side-by-side Raw vs. Masked Transformation Matrix.
-* **One-Command CLI Management:** Custom Bash orchestration script (`manage.sh`) to start, stop, monitor, or tail logs across all tiers.
-* **Production CI/CD:** GitHub Actions workflow verifying PostGIS migrations and React Vite production builds on every commit.
+- **Ingested Spatial Masking:** Converts GPS points into 7-character Base32 Geohashes (≈153m × 153m grid resolution) on ingestion, immediately discarding pinpoint street coordinates.
+- **PostGIS R-Tree (GiST) Spatial Indexing:** Leverages Generalized Search Trees over spatial MultiPolygons for O(log N) containment evaluations.
+- **ε-Geo-Indistinguishability:** Stored PL/pgSQL procedures inject 2D Planar Laplace noise (ε = 1.5) into aggregate queries, mathematically preventing trajectory reconstruction.
+- **Real-Time Control Dashboard:** Dark-themed React/Leaflet dashboard displaying active delivery geofences, driver markers, real-time audit output cards, and a side-by-side Raw vs. Masked Transformation Matrix.
+- **One-Command CLI Management:** Custom Bash orchestration script (`manage.sh`) to start, stop, monitor, or tail logs across all tiers.
+- **Production CI/CD:** GitHub Actions workflow verifying PostGIS migrations and React Vite production builds on every commit.
 
 ---
 
 ## Architecture & Data Pipeline
 
-
-```
-
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        INGESTION & OBFUSCATION                          │
-│ Driver GPS (Lat, Lon) ──► 7-Char Base32 Geohash ──► Discard Raw Coords  │
-└────────────────────────────────────┬────────────────────────────────────┘
-│
-▼
+│  Driver GPS (Lat, Lon) ──► 7-Char Base32 Geohash ──► Discard Raw Coords │
+└────────────────────────────────────┬──────────────────────────────────-─┘
+                                      │
+                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    SPATIAL INDEXING & PERSISTENCE                       │
 │  PostGIS 16 / Spatial DB ──► R-Tree (GiST) Indexing ──► O(log N) Lookup │
-└────────────────────────────────────┬────────────────────────────────────┘
-│
-▼
+└────────────────────────────────────┬─────────────────────────────────-──┘
+                                      │
+                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     DIFFERENTIAL PRIVACY AUDITING                       │
 │  sp_generate_privacy_audit ──► 2D Laplace Noise (ε = 1.5) ──► Perturbed │
-└────────────────────────────────────┬────────────────────────────────────┘
-│
-▼
+└────────────────────────────────────┬─────────────────────────────────-──┘
+                                      │
+                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     CONTROL CENTER VISUALIZATION                        │
 │  React + Leaflet Dashboard ──► Live Transformation Matrix & Mapping     │
 └─────────────────────────────────────────────────────────────────────────┘
-
 ```
 
 ---
@@ -104,15 +100,15 @@ Before installing and running CryptoSpatial-DB, ensure your environment meets th
 Follow these step-by-step instructions to clone, configure, and launch the entire CryptoSpatial-DB stack locally.
 
 ### Step 1: Clone the Repository
+
 Open your WSL2 / Linux terminal and clone the official repository:
 
 ```bash
 # Clone repository from GitHub
-git clone [https://github.com/ihsn525/cryptospatial-db.git](https://github.com/ihsn525/cryptospatial-db.git)
+git clone https://github.com/ihsn525/cryptospatial-db.git
 
 # Navigate into project root directory
 cd cryptospatial-db
-
 ```
 
 ---
@@ -137,7 +133,6 @@ pip install -r requirements.txt
 
 # Return to root directory
 cd ..
-
 ```
 
 #### 2.2 Frontend Dependencies Setup
@@ -151,7 +146,6 @@ npm install
 
 # Return to root directory
 cd ..
-
 ```
 
 ---
@@ -167,7 +161,6 @@ chmod +x manage.sh
 # Grant Docker group permissions (if not already applied)
 sudo usermod -aG docker $USER
 newgrp docker
-
 ```
 
 ---
@@ -179,7 +172,6 @@ Launch all three tiers (PostGIS Database Docker Container, FastAPI Middleware Ba
 ```bash
 # Start all services
 ./manage.sh start
-
 ```
 
 #### Expected Terminal Output:
@@ -193,13 +185,12 @@ Launch all three tiers (PostGIS Database Docker Container, FastAPI Middleware Ba
       React Vite started (PID: 12346). Logs -> logs/frontend.log
 
 ==================================================
-           CryptoSpatial-DB Status                
+           CryptoSpatial-DB Status
 ==================================================
   Database (PostGIS 16): [ ONLINE  ] (Port 5432)
-  Backend  (FastAPI):    [ ONLINE  ] -> [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+  Backend  (FastAPI):    [ ONLINE  ] -> http://127.0.0.1:8000/docs
   Frontend (React Vite): [ ONLINE  ] -> http://localhost:5173
 ==================================================
-
 ```
 
 ---
@@ -208,9 +199,9 @@ Launch all three tiers (PostGIS Database Docker Container, FastAPI Middleware Ba
 
 Once started, open your browser and access the following interfaces:
 
-* **Interactive Frontend Dashboard:** `http://localhost:5173`
-* **FastAPI Swagger API Documentation:** `http://127.0.0.1:8000/docs`
-* **PostgreSQL / PostGIS Database Connection:** `localhost:5432` (`user: postgres`, `db: cryptospatial_db`)
+- **Interactive Frontend Dashboard:** `http://localhost:5173`
+- **FastAPI Swagger API Documentation:** `http://127.0.0.1:8000/docs`
+- **PostgreSQL / PostGIS Database Connection:** `localhost:5432` (`user: postgres`, `db: cryptospatial_db`)
 
 ---
 
@@ -233,7 +224,6 @@ The `manage.sh` script handles process isolation, daemon lifecycle management, a
 
 # Safely stop all servers and database containers
 ./manage.sh stop
-
 ```
 
 ---
@@ -246,7 +236,7 @@ The FastAPI backend exposes the following REST API endpoints:
 | --- | --- | --- | --- |
 | `/api/v1/seed-geofences` | `POST` | Seeds Koramangala & Indiranagar MultiPolygons into PostGIS | None |
 | `/api/v1/simulate-pings` | `POST` | Generates randomized driver pings across Bengaluru hubs | `count=15` |
-| `/api/v1/trigger-audit` | `POST` | Executes PostGIS procedure with Laplace Noise ($\epsilon = 1.5$) | `epsilon=1.5` |
+| `/api/v1/trigger-audit` | `POST` | Executes PostGIS procedure with Laplace Noise (ε = 1.5) | `epsilon=1.5` |
 | `/api/v1/spatial-logs` | `GET` | Fetches ingested Geohash logs & raw transformation records | None |
 | `/api/v1/audit-reports` | `GET` | Retrieves historical differential privacy audit logs | None |
 | `/api/v1/reset-pings` | `DELETE` | Flushes spatial logs and audit reports, resetting PK counters | None |
@@ -276,7 +266,6 @@ CREATE TABLE IF NOT EXISTS geofences (
 );
 
 CREATE INDEX IF NOT EXISTS idx_geofences_spatial ON geofences USING GIST(boundary_polygon);
-
 ```
 
 ### 2. Differential Privacy Stored Procedure (`database/migrations/002_update_procedure.sql`)
@@ -306,7 +295,6 @@ BEGIN
     VALUES (p_geofence_id, v_true_count, v_noise, v_reported);
 END;
 $$;
-
 ```
 
 ---
@@ -330,7 +318,6 @@ Every push or pull request to the `main` branch triggers an automated GitHub Act
 sudo chown root:docker /var/run/docker.sock
 sudo chmod 660 /var/run/docker.sock
 newgrp docker
-
 ```
 
 ### Issue 2: Address already in use (`Port 8000` or `Port 5173`)
@@ -341,43 +328,24 @@ newgrp docker
 fuser -k 8000/tcp
 fuser -k 5173/tcp
 ./manage.sh restart
-
 ```
 
 ### Issue 3: Stored Procedure throws `ST_PointFromGeoHash` error
 
-**Fix:** Ensure PostGIS spatial extension is enabled in your database:
+**Fix:** Ensure the PostGIS spatial extension is enabled in your database:
 
 ```bash
 docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-
 ```
-
----
-
-## Faculty Review Defense Q&A
-
-* **Q: Why are raw latitude and longitude coordinates shown in the UI table?**
-* **A:** Raw coordinates are rendered strictly within the demonstration inspection matrix to prove the mathematical transformation to evaluators. In production, Geohash generation occurs client-side on driver devices, preventing raw coordinates from leaving the mobile perimeter.
-
-
-* **Q: Why does the audit result count fluctuate on consecutive triggers?**
-* **A:** This is a deliberate security feature of Differential Privacy ($\epsilon = 1.5$). The stored procedure samples fresh Laplace noise on every query run. Stochastic noise sampling prevents adversaries from inferring exact counts via repeated differencing queries.
-
-
-* **Q: How does PostGIS check geofence containment if only Geohashes are stored?**
-* **A:** PostGIS uses `ST_PointFromGeoHash()` to dynamically decode the 7-character string back into a bounding point geometry at query time, evaluating containment against GiST-indexed MultiPolygon boundaries via `ST_Contains()`.
-
-
 
 ---
 
 ## Future Engineering Roadmap
 
-* **Phase 1 (Client-Side SDK):** Native iOS/Android SDKs for edge Geohashing and SGX hardware enclave noise generation.
-* **Phase 2 (Streaming Ingestion):** High-throughput Apache Kafka event streaming with real-time, dynamic geofence boundaries.
-* **Phase 3 (Zero-Knowledge Proofs):** Integration of ZK-SNARKs allowing driver devices to cryptographically prove zone containment without transmitting Geohash strings.
-* **Phase 4 (SaaS Compliance Engine):** Multi-tenant isolation with automated regulatory export reporting for the India DPDP Act (2023), EU GDPR, and US CCPA.
+- **Phase 1 (Client-Side SDK):** Native iOS/Android SDKs for edge Geohashing and SGX hardware enclave noise generation.
+- **Phase 2 (Streaming Ingestion):** High-throughput Apache Kafka event streaming with real-time, dynamic geofence boundaries.
+- **Phase 3 (Zero-Knowledge Proofs):** Integration of ZK-SNARKs allowing driver devices to cryptographically prove zone containment without transmitting Geohash strings.
+- **Phase 4 (SaaS Compliance Engine):** Multi-tenant isolation with automated regulatory export reporting for the India DPDP Act (2023), EU GDPR, and US CCPA.
 
 ---
 
@@ -385,10 +353,7 @@ docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "C
 
 Distributed under the **MIT License**.
 
-* **Author:** Ihsan Siju
-* **GitHub:** [@ihsn525](https://www.google.com/search?q=https://github.com/ihsn525&utm_source=gemini)
-* **Project Repository:** [CryptoSpatial-DB on GitHub](https://github.com/ihsn525/cryptospatial-db?utm_source=gemini)
-
-```
-
-```
+- **Author:** Ihsan Siju
+- **GitHub:** [@ihsn525](https://github.com/ihsn525) 
+- **Collaborator(s):** Hanna Ann, Gowrika Menon
+- **Project Repository:** [CryptoSpatial-DB on GitHub](https://github.com/ihsn525/cryptospatial-db)
