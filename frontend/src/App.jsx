@@ -193,13 +193,14 @@ export default function App() {
               </Polygon>
             ))}
             {logs.map((log) => {
-              const coords = log.raw_lat && log.raw_lon ? [log.raw_lat, log.raw_lon] : decodeGeohash(log.masked_geohash);
+              // Decode center point coordinates dynamically from the Geohash
+              const coords = decodeGeohash(log.masked_geohash);
               return (
                 <CircleMarker key={log.log_id} center={coords} radius={6} pathOptions={{ color: '#60A5FA', fillColor: '#3B82F6', fillOpacity: 0.8 }}>
                   <Popup>
                     <b>Geohash:</b> {log.masked_geohash}<br />
-                    <b>Raw Lat:</b> {log.raw_lat || 'Masked'}<br />
-                    <b>Raw Lon:</b> {log.raw_lon || 'Masked'}
+                    <b>Raw Lat:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
+                    <b>Raw Lon:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span>
                   </Popup>
                 </CircleMarker>
               );
@@ -258,8 +259,8 @@ export default function App() {
                   logs.map((log) => (
                     <tr key={log.log_id} style={styles.tr}>
                       <td style={styles.tdMonospace}>#{log.log_id}</td>
-                      <td style={styles.tdRaw}>{log.raw_lat ? log.raw_lat.toFixed(6) : 'Hidden'}° N</td>
-                      <td style={styles.tdRaw}>{log.raw_lon ? log.raw_lon.toFixed(6) : 'Hidden'}° E</td>
+                      <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
+                      <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
                       <td style={styles.tdEncrypted}><code>{log.masked_geohash}</code></td>
                       <td style={styles.tdPill}>
                         <span style={styles.pillActive}>Masked & Differential Privacy Protected</span>
@@ -319,7 +320,7 @@ const styles = {
   th: { padding: '10px 14px', backgroundColor: '#1F2937', color: '#9CA3AF', borderBottom: '1px solid #374151', fontWeight: '600' },
   tr: { borderBottom: '1px solid #1F2937' },
   tdMonospace: { padding: '10px 14px', fontFamily: 'monospace', color: '#9CA3AF' },
-  tdRaw: { padding: '10px 14px', fontFamily: 'monospace', color: '#F87171' },
+  tdRedacted: { padding: '10px 14px', fontFamily: 'monospace', color: '#EF4444', fontWeight: '600' },
   tdEncrypted: { padding: '10px 14px', fontFamily: 'monospace', color: '#60A5FA', fontWeight: '600' },
   tdPill: { padding: '10px 14px' },
   pillActive: { backgroundColor: '#064E3B', color: '#34D399', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', fontWeight: '600' },

@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import Column, String, BigInteger, DateTime, Float, Integer, Boolean, select, text
 from pydantic import BaseModel
-from sqlalchemy import text
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:cryptosecretpassword99@localhost:5432/cryptospatial_db")
 
@@ -53,8 +52,8 @@ def encode_geohash(latitude, longitude, precision=7):
 class SpatialLogModel(Base):
     __tablename__ = "spatial_logs"
     log_id = Column(BigInteger, primary_key=True, index=True)
-    raw_lat = Column(Float, nullable=True)
-    raw_lon = Column(Float, nullable=True)
+    raw_lat = Column(Float, nullable=True) # Retained in DB for database shell demo only
+    raw_lon = Column(Float, nullable=True) # Retained in DB for database shell demo only
     masked_geohash = Column(String(12), nullable=False)
     recorded_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
@@ -93,13 +92,30 @@ async def get_db():
 async def root():
     return {"status": "online", "system": "CryptoSpatial-DB Middleware Engine"}
 
-# 1. Fetch Spatial Logs
+# 1. Fetch Spatial Logs (PRIVACY-HARDENED: Excludes raw_lat and raw_lon)
 @app.get("/api/v1/spatial-logs")
 async def get_spatial_logs(limit: int = 50, db: AsyncSession = Depends(get_db)):
-    stmt = select(SpatialLogModel).order_by(SpatialLogModel.log_id.desc()).limit(limit)
+    # Select ONLY non-sensitive columns
+    stmt = select(
+        SpatialLogModel.log_id, 
+        SpatialLogModel.masked_geohash, 
+        SpatialLogModel.recorded_at
+    ).order_by(SpatialLogModel.log_id.desc()).limit(limit)
+    
     result = await db.execute(stmt)
-    logs = result.scalars().all()
-    return {"count": len(logs), "data": logs}
+    logs = result.all()
+    
+    return {
+        "count": len(logs), 
+        "data": [
+            {
+                "log_id": log.log_id,
+                "masked_geohash": log.masked_geohash,
+                "recorded_at": log.recorded_at
+            } 
+            for log in logs
+        ]
+    }
 
 # 2. Simulate Driver GPS Location Pings
 @app.post("/api/v1/simulate-pings")
@@ -117,9 +133,10 @@ async def simulate_driver_pings(count: int = 15, db: AsyncSession = Depends(get_
         lon = round(lon_base + random.uniform(-0.008, 0.008), 6)
         
         ghash = encode_geohash(lat, lon, precision=7)
+        # Raw coords stored in DB for psql terminal showcase only
         ping = SpatialLogModel(raw_lat=lat, raw_lon=lon, masked_geohash=ghash)
         db.add(ping)
-        new_pings.append({"lat": lat, "lon": lon, "geohash": ghash})
+        new_pings.append({"geohash": ghash})
     
     await db.commit()
     return {"status": "success", "generated_pings": len(new_pings), "pings": new_pings}
@@ -133,7 +150,6 @@ async def reset_spatial_pings(db: AsyncSession = Depends(get_db)):
 # 3. Seed Default Geofence Hubs
 @app.post("/api/v1/seed-geofences")
 async def seed_geofences(db: AsyncSession = Depends(get_db)):
-    # Insert Koramangala & Indiranagar Spatial Polygons
     seed_sql = text("""
         INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
         VALUES 
@@ -150,7 +166,6 @@ async def seed_geofences(db: AsyncSession = Depends(get_db)):
 # 4. Trigger Differential Privacy Audit
 @app.post("/api/v1/trigger-audit")
 async def trigger_privacy_audit(epsilon: float = 1.0, db: AsyncSession = Depends(get_db)):
-    # Fetch random geofence
     stmt = select(GeofenceModel).limit(1)
     res = await db.execute(stmt)
     geofence = res.scalars().first()
@@ -158,13 +173,10 @@ async def trigger_privacy_audit(epsilon: float = 1.0, db: AsyncSession = Depends
     if not geofence:
         raise HTTPException(status_code=400, detail="No geofences found. Please seed geofences first.")
     
-    # Execute PostGIS Audit Stored Procedure
-    # Updated SQL call with explicit UUID casting
     proc_sql = text("CALL sp_generate_privacy_audit(CAST(:g_id AS uuid), :eps)")
     await db.execute(proc_sql, {"g_id": str(geofence.geofence_id), "eps": float(epsilon)})
     await db.commit()
     
-    # Fetch generated report
     rep_stmt = select(AuditReportModel).order_by(AuditReportModel.generated_at.desc()).limit(1)
     rep_res = await db.execute(rep_stmt)
     report = rep_res.scalars().first()
