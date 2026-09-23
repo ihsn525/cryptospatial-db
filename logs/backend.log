@@ -1,0 +1,1089 @@
+INFO:     Will watch for changes in these directories: ['/home/ihsn525/projects/cryptospatial-db/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [1453] using StatReload
+INFO:     Started server process [1472]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:55590 - "GET /docs HTTP/1.1" 200 OK
+2026-09-23 05:36:54,423 INFO sqlalchemy.engine.Engine select pg_catalog.version()
+2026-09-23 05:36:54,423 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-09-23 05:36:54,426 INFO sqlalchemy.engine.Engine select current_schema()
+2026-09-23 05:36:54,426 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-09-23 05:36:54,429 INFO sqlalchemy.engine.Engine show standard_conforming_strings
+2026-09-23 05:36:54,429 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-09-23 05:36:54,430 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:36:54,432 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:36:54,432 INFO sqlalchemy.engine.Engine [generated in 0.00015s] (50,)
+2026-09-23 05:36:54,434 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:36:54,435 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 05:36:54,435 INFO sqlalchemy.engine.Engine [generated in 0.00013s] ()
+2026-09-23 05:36:54,439 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:36:54,443 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:36:54,443 INFO sqlalchemy.engine.Engine [generated in 0.00073s] (10,)
+2026-09-23 05:36:54,445 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57502 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:36:54,457 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:36:54,458 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 05:36:54,458 INFO sqlalchemy.engine.Engine [cached since 0.02286s ago] ()
+2026-09-23 05:36:54,458 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 05:36:54,459 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:36:54,459 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:36:54,460 INFO sqlalchemy.engine.Engine [cached since 0.02766s ago] (50,)
+2026-09-23 05:36:54,462 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57518 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57536 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:36:54,465 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:36:54,466 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:36:54,466 INFO sqlalchemy.engine.Engine [cached since 0.02315s ago] (10,)
+2026-09-23 05:36:54,469 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57502 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:36:54,501 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 05:36:54,501 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:57486 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57524 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57550 - "OPTIONS /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 05:37:00,485 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:37:00,485 INFO sqlalchemy.engine.Engine TRUNCATE TABLE spatial_logs, audit_reports RESTART IDENTITY CASCADE;
+2026-09-23 05:37:00,485 INFO sqlalchemy.engine.Engine [generated in 0.00009s] ()
+2026-09-23 05:37:00,528 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:57550 - "DELETE /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 05:37:00,579 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:37:00,579 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:37:00,579 INFO sqlalchemy.engine.Engine [cached since 6.147s ago] (50,)
+2026-09-23 05:37:00,581 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57550 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:37:00,627 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:37:00,627 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:37:00,627 INFO sqlalchemy.engine.Engine [cached since 6.185s ago] (10,)
+2026-09-23 05:37:00,629 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57550 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:37:21,587 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:37:21,590 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 05:37:21,590 INFO sqlalchemy.engine.Engine [generated in 0.00030s (insertmanyvalues) 1/1 (ordered)] (12.915408, 77.647941, 'tdr1qzj', datetime.datetime(2026, 9, 23, 5, 37, 21, 590266), 12.933196, 77.631914, 'tdr1wd3', datetime.datetime(2026, 9, 23, 5, 37, 21, 590274), 12.934356, 77.620464, 'tdr1w69', datetime.datetime(2026, 9, 23, 5, 37, 21, 590277), 12.916472, 77.637487, 'tdr1qxm', datetime.datetime(2026, 9, 23, 5, 37, 21, 590279), 12.914156, 77.642902, 'tdr1qyc', datetime.datetime(2026, 9, 23, 5, 37, 21, 590281), 12.978373, 77.638718, 'tdr1ydw', datetime.datetime(2026, 9, 23, 5, 37, 21, 590283), 12.98188, 77.634147, 'tdr1ye7', datetime.datetime(2026, 9, 23, 5, 37, 21, 590285), 12.912546, 77.634902, 'tdr1qws', datetime.datetime(2026, 9, 23, 5, 37, 21, 590287), 12.94282, 77.630034, 'tdr1ws0', datetime.datetime(2026, 9, 23, 5, 37, 21, 590289), 12.90781, 77.634703, 'tdr1qtg', datetime.datetime(2026, 9, 23, 5, 37, 21, 590291), 12.93589, 77.617924, 'tdr1w4z', datetime.datetime(2026, 9, 23, 5, 37, 21, 590293), 12.933144, 77.628876, 'tdr1w6r', datetime.datetime(2026, 9, 23, 5, 37, 21, 590295), 12.91301, 77.633274, 'tdr1qwd', datetime.datetime(2026, 9, 23, 5, 37, 21, 590296), 12.934763, 77.61863, 'tdr1w68', datetime.datetime(2026, 9, 23, 5, 37, 21, 590298), 12.912908, 77.635338, 'tdr1qws', datetime.datetime(2026, 9, 23, 5, 37, 21, 590300))
+2026-09-23 05:37:21,601 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:42254 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 05:37:21,612 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:37:21,612 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:37:21,612 INFO sqlalchemy.engine.Engine [cached since 24.45s ago] (50,)
+2026-09-23 05:37:21,614 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:42254 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:39:46,165 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:39:46,166 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:39:46,166 INFO sqlalchemy.engine.Engine [cached since 158.1s ago] (50,)
+2026-09-23 05:39:46,168 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 05:39:46,169 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:39:46,169 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 05:39:46,169 INFO sqlalchemy.engine.Engine [cached since 158.1s ago] ()
+INFO:     127.0.0.1:37828 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:39:46,170 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:37842 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 05:39:46,172 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:39:46,172 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:39:46,172 INFO sqlalchemy.engine.Engine [cached since 158.1s ago] (10,)
+2026-09-23 05:39:46,173 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:39:46,173 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 05:39:46,173 INFO sqlalchemy.engine.Engine [cached since 158.1s ago] ()
+2026-09-23 05:39:46,175 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:37848 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:39:46,178 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:39:46,178 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:39:46,179 INFO sqlalchemy.engine.Engine [cached since 158.1s ago] (50,)
+2026-09-23 05:39:46,180 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:39:46,180 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:39:46,180 INFO sqlalchemy.engine.Engine [cached since 158.1s ago] (10,)
+2026-09-23 05:39:46,183 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 05:39:46,186 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 05:39:46,186 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:37842 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37860 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37852 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 05:40:18,322 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:18,323 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:18,324 INFO sqlalchemy.engine.Engine [generated in 0.00020s] (1,)
+2026-09-23 05:40:18,327 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 05:40:18,327 INFO sqlalchemy.engine.Engine [generated in 0.00029s] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 05:40:18,378 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 05:40:18,381 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:18,381 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:18,381 INFO sqlalchemy.engine.Engine [cached since 187.7s ago] (1,)
+2026-09-23 05:40:18,383 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:59978 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 05:40:18,389 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:18,390 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:18,390 INFO sqlalchemy.engine.Engine [cached since 187.7s ago] (10,)
+2026-09-23 05:40:18,392 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:59978 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:40:37,704 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:37,705 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 05:40:37,705 INFO sqlalchemy.engine.Engine [cached since 179.8s ago (insertmanyvalues) 1/1 (ordered)] (12.907202, 77.642085, 'tdr1qv9', datetime.datetime(2026, 9, 23, 5, 40, 37, 704819), 12.914104, 77.644784, 'tdr1qyg', datetime.datetime(2026, 9, 23, 5, 40, 37, 704824), 12.906672, 77.648788, 'tdr1qvw', datetime.datetime(2026, 9, 23, 5, 40, 37, 704825), 12.974113, 77.637771, 'tdr1y9y', datetime.datetime(2026, 9, 23, 5, 40, 37, 704827), 12.939052, 77.628227, 'tdr1w7r', datetime.datetime(2026, 9, 23, 5, 40, 37, 704828), 12.975279, 77.647085, 'tdr1yfh', datetime.datetime(2026, 9, 23, 5, 40, 37, 704830), 12.941911, 77.624742, 'tdr1wkh', datetime.datetime(2026, 9, 23, 5, 40, 37, 704831), 12.930571, 77.632344, 'tdr1w9f', datetime.datetime(2026, 9, 23, 5, 40, 37, 704833), 12.97107, 77.637344, 'tdr1y9m', datetime.datetime(2026, 9, 23, 5, 40, 37, 704834), 12.975816, 77.641892, 'tdr1yf1', datetime.datetime(2026, 9, 23, 5, 40, 37, 704835), 12.931299, 77.619751, 'tdr1w60', datetime.datetime(2026, 9, 23, 5, 40, 37, 704837), 12.906467, 77.636501, 'tdr1qtt', datetime.datetime(2026, 9, 23, 5, 40, 37, 704838), 12.913962, 77.635523, 'tdr1qwu', datetime.datetime(2026, 9, 23, 5, 40, 37, 704840), 12.977487, 77.637008, 'tdr1ydm', datetime.datetime(2026, 9, 23, 5, 40, 37, 704841), 12.973854, 77.647122, 'tdr1ycu', datetime.datetime(2026, 9, 23, 5, 40, 37, 704843))
+2026-09-23 05:40:37,710 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:33988 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 05:40:37,744 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:37,745 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:37,745 INFO sqlalchemy.engine.Engine [cached since 204.2s ago] (50,)
+2026-09-23 05:40:37,746 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:33988 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:40:39,870 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:39,870 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:39,870 INFO sqlalchemy.engine.Engine [cached since 18.76s ago] (1,)
+2026-09-23 05:40:39,872 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 05:40:39,872 INFO sqlalchemy.engine.Engine [cached since 18.75s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 05:40:39,874 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 05:40:39,904 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:39,904 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:39,904 INFO sqlalchemy.engine.Engine [cached since 206.4s ago] (1,)
+2026-09-23 05:40:39,905 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:33988 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 05:40:39,910 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:40:39,910 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:40:39,910 INFO sqlalchemy.engine.Engine [cached since 206.4s ago] (10,)
+2026-09-23 05:40:39,912 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:33988 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:56:08,831 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:08,832 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 05:56:08,832 INFO sqlalchemy.engine.Engine [cached since 1041s ago (insertmanyvalues) 1/1 (ordered)] (12.91026, 77.639412, 'tdr1qwp', datetime.datetime(2026, 9, 23, 5, 56, 8, 832126), 12.942721, 77.617711, 'tdr1whp', datetime.datetime(2026, 9, 23, 5, 56, 8, 832132), 12.913313, 77.640757, 'tdr1qyb', datetime.datetime(2026, 9, 23, 5, 56, 8, 832134), 12.937319, 77.621423, 'tdr1w74', datetime.datetime(2026, 9, 23, 5, 56, 8, 832136), 12.977541, 77.633169, 'tdr1yd6', datetime.datetime(2026, 9, 23, 5, 56, 8, 832138), 12.973277, 77.638788, 'tdr1y9w', datetime.datetime(2026, 9, 23, 5, 56, 8, 832139), 12.929216, 77.61864, 'tdr1w38', datetime.datetime(2026, 9, 23, 5, 56, 8, 832141), 12.913155, 77.647441, 'tdr1qyv', datetime.datetime(2026, 9, 23, 5, 56, 8, 832143), 12.972349, 77.643464, 'tdr1ycd', datetime.datetime(2026, 9, 23, 5, 56, 8, 832144), 12.981636, 77.635519, 'tdr1yeh', datetime.datetime(2026, 9, 23, 5, 56, 8, 832146), 12.913128, 77.647921, 'tdr1qyv', datetime.datetime(2026, 9, 23, 5, 56, 8, 832147), 12.908005, 77.646082, 'tdr1qvu', datetime.datetime(2026, 9, 23, 5, 56, 8, 832149), 12.912302, 77.640273, 'tdr1qwx', datetime.datetime(2026, 9, 23, 5, 56, 8, 832150), 12.97215, 77.640173, 'tdr1y9x', datetime.datetime(2026, 9, 23, 5, 56, 8, 832152), 12.934344, 77.630804, 'tdr1wd9', datetime.datetime(2026, 9, 23, 5, 56, 8, 832153))
+2026-09-23 05:56:08,836 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:36182 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 05:56:08,852 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:08,852 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:56:08,853 INFO sqlalchemy.engine.Engine [cached since 1065s ago] (50,)
+2026-09-23 05:56:08,858 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:36182 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36182 - "OPTIONS /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 05:56:13,176 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:13,176 INFO sqlalchemy.engine.Engine TRUNCATE TABLE spatial_logs, audit_reports RESTART IDENTITY CASCADE;
+2026-09-23 05:56:13,176 INFO sqlalchemy.engine.Engine [cached since 1061s ago] ()
+2026-09-23 05:56:13,195 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:36182 - "DELETE /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 05:56:13,248 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:13,249 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:56:13,249 INFO sqlalchemy.engine.Engine [cached since 1067s ago] (50,)
+2026-09-23 05:56:13,252 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:36182 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:56:13,299 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:13,299 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:56:13,299 INFO sqlalchemy.engine.Engine [cached since 1067s ago] (10,)
+2026-09-23 05:56:13,301 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:36182 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:56:13,977 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:13,979 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 05:56:13,979 INFO sqlalchemy.engine.Engine [cached since 1043s ago (insertmanyvalues) 1/1 (ordered)] (12.976493, 77.640042, 'tdr1ydr', datetime.datetime(2026, 9, 23, 5, 56, 13, 978981), 12.97694, 77.633016, 'tdr1yd6', datetime.datetime(2026, 9, 23, 5, 56, 13, 978983), 12.977388, 77.640365, 'tdr1ydr', datetime.datetime(2026, 9, 23, 5, 56, 13, 978984), 12.910925, 77.638861, 'tdr1qwq', datetime.datetime(2026, 9, 23, 5, 56, 13, 978985), 12.983222, 77.64277, 'tdr1yg9', datetime.datetime(2026, 9, 23, 5, 56, 13, 978985), 12.921172, 77.643788, 'tdr1wb4', datetime.datetime(2026, 9, 23, 5, 56, 13, 978986), 12.971989, 77.643616, 'tdr1yc6', datetime.datetime(2026, 9, 23, 5, 56, 13, 978987), 12.980166, 77.633873, 'tdr1ydg', datetime.datetime(2026, 9, 23, 5, 56, 13, 978987), 12.909854, 77.645773, 'tdr1qy5', datetime.datetime(2026, 9, 23, 5, 56, 13, 978988), 12.974575, 77.638304, 'tdr1y9y', datetime.datetime(2026, 9, 23, 5, 56, 13, 978988), 12.936699, 77.627363, 'tdr1w7n', datetime.datetime(2026, 9, 23, 5, 56, 13, 978989), 12.936654, 77.618328, 'tdr1w5p', datetime.datetime(2026, 9, 23, 5, 56, 13, 978990), 12.937677, 77.622206, 'tdr1w74', datetime.datetime(2026, 9, 23, 5, 56, 13, 978990), 12.972257, 77.645205, 'tdr1yce', datetime.datetime(2026, 9, 23, 5, 56, 13, 978991), 12.921439, 77.638434, 'tdr1w8q', datetime.datetime(2026, 9, 23, 5, 56, 13, 978991))
+2026-09-23 05:56:13,981 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:36182 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 05:56:14,020 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:56:14,020 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:56:14,020 INFO sqlalchemy.engine.Engine [cached since 1068s ago] (50,)
+2026-09-23 05:56:14,023 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:36182 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:58:33,518 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:58:33,518 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:58:33,518 INFO sqlalchemy.engine.Engine [cached since 1197s ago] (50,)
+2026-09-23 05:58:33,519 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:58:33,519 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:58:33,519 INFO sqlalchemy.engine.Engine [cached since 1197s ago] (10,)
+2026-09-23 05:58:33,521 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 05:58:33,521 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:58:33,522 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 05:58:33,522 INFO sqlalchemy.engine.Engine [cached since 1197s ago] ()
+2026-09-23 05:58:33,522 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:46634 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46640 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:58:33,523 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:46644 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 05:58:33,525 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:58:33,526 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 05:58:33,526 INFO sqlalchemy.engine.Engine [cached since 1197s ago] ()
+2026-09-23 05:58:33,526 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:58:33,527 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:58:33,527 INFO sqlalchemy.engine.Engine [cached since 1197s ago] (10,)
+2026-09-23 05:58:33,528 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:46634 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 05:58:33,536 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 05:58:33,536 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 05:58:33,537 INFO sqlalchemy.engine.Engine [cached since 1197s ago] (50,)
+2026-09-23 05:58:33,538 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:46668 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 05:58:33,548 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:46652 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 06:04:31,245 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:31,245 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:31,246 INFO sqlalchemy.engine.Engine [cached since 1340s ago] (1,)
+2026-09-23 06:04:31,249 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:04:31,249 INFO sqlalchemy.engine.Engine [cached since 1340s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:04:31,253 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:04:31,285 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:31,285 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:31,285 INFO sqlalchemy.engine.Engine [cached since 1527s ago] (1,)
+2026-09-23 06:04:31,287 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45288 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:04:31,297 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:31,298 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:31,298 INFO sqlalchemy.engine.Engine [cached since 1527s ago] (10,)
+2026-09-23 06:04:31,302 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45288 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:04:56,855 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:56,855 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:56,855 INFO sqlalchemy.engine.Engine [cached since 1363s ago] (1,)
+2026-09-23 06:04:56,858 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:04:56,858 INFO sqlalchemy.engine.Engine [cached since 1363s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:04:56,864 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:04:56,866 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:56,866 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:56,867 INFO sqlalchemy.engine.Engine [cached since 1550s ago] (1,)
+2026-09-23 06:04:56,868 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:04:56,874 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:56,874 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:56,874 INFO sqlalchemy.engine.Engine [cached since 1550s ago] (10,)
+2026-09-23 06:04:56,876 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:04:57,632 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:57,632 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:57,633 INFO sqlalchemy.engine.Engine [cached since 1364s ago] (1,)
+2026-09-23 06:04:57,635 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:04:57,635 INFO sqlalchemy.engine.Engine [cached since 1364s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:04:57,637 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:04:57,669 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:57,669 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:57,669 INFO sqlalchemy.engine.Engine [cached since 1551s ago] (1,)
+2026-09-23 06:04:57,672 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:04:57,680 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:57,680 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:57,680 INFO sqlalchemy.engine.Engine [cached since 1551s ago] (10,)
+2026-09-23 06:04:57,683 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:04:58,656 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:58,656 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:58,656 INFO sqlalchemy.engine.Engine [cached since 1365s ago] (1,)
+2026-09-23 06:04:58,660 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:04:58,660 INFO sqlalchemy.engine.Engine [cached since 1365s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:04:58,667 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:04:58,671 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:58,671 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:58,672 INFO sqlalchemy.engine.Engine [cached since 1552s ago] (1,)
+2026-09-23 06:04:58,675 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:04:58,684 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:58,684 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:58,684 INFO sqlalchemy.engine.Engine [cached since 1552s ago] (10,)
+2026-09-23 06:04:58,687 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:04:59,692 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:59,692 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:59,692 INFO sqlalchemy.engine.Engine [cached since 1366s ago] (1,)
+2026-09-23 06:04:59,694 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:04:59,695 INFO sqlalchemy.engine.Engine [cached since 1366s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:04:59,696 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:04:59,700 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:59,700 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:59,700 INFO sqlalchemy.engine.Engine [cached since 1553s ago] (1,)
+2026-09-23 06:04:59,703 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:04:59,711 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:04:59,711 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:04:59,711 INFO sqlalchemy.engine.Engine [cached since 1553s ago] (10,)
+2026-09-23 06:04:59,714 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57496 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:05:32,201 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:05:32,201 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:05:32,201 INFO sqlalchemy.engine.Engine [cached since 1583s ago] (50,)
+2026-09-23 06:05:32,203 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 06:05:32,204 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:05:32,205 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:05:32,205 INFO sqlalchemy.engine.Engine [cached since 1583s ago] (10,)
+INFO:     127.0.0.1:56454 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:05:32,206 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:05:32,206 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 06:05:32,206 INFO sqlalchemy.engine.Engine [cached since 1583s ago] ()
+2026-09-23 06:05:32,207 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:56456 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:05:32,208 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:56468 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 06:05:32,209 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:05:32,210 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 06:05:32,210 INFO sqlalchemy.engine.Engine [cached since 1583s ago] ()
+2026-09-23 06:05:32,211 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:05:32,211 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:05:32,211 INFO sqlalchemy.engine.Engine [cached since 1583s ago] (10,)
+2026-09-23 06:05:32,212 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:05:32,212 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:56482 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56454 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:05:32,214 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:05:32,214 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:05:32,214 INFO sqlalchemy.engine.Engine [cached since 1583s ago] (50,)
+2026-09-23 06:05:32,216 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:56494 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:06:37,723 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:37,723 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:37,723 INFO sqlalchemy.engine.Engine [cached since 1456s ago] (1,)
+2026-09-23 06:06:37,726 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:06:37,726 INFO sqlalchemy.engine.Engine [cached since 1456s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:06:37,728 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:06:37,732 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:37,732 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:37,733 INFO sqlalchemy.engine.Engine [cached since 1643s ago] (1,)
+2026-09-23 06:06:37,735 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:52606 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:06:37,746 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:37,747 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:37,747 INFO sqlalchemy.engine.Engine [cached since 1643s ago] (10,)
+2026-09-23 06:06:37,750 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:52606 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:06:51,697 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:51,697 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:51,697 INFO sqlalchemy.engine.Engine [cached since 1657s ago] (50,)
+2026-09-23 06:06:51,699 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 06:06:51,700 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:51,700 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:51,700 INFO sqlalchemy.engine.Engine [cached since 1657s ago] (10,)
+INFO:     127.0.0.1:35790 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:06:51,703 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:35804 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:06:51,706 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:51,706 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:51,706 INFO sqlalchemy.engine.Engine [cached since 1657s ago] (10,)
+2026-09-23 06:06:51,707 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-23 06:06:51,708 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:51,708 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 06:06:51,709 INFO sqlalchemy.engine.Engine [cached since 1657s ago] ()
+INFO:     127.0.0.1:35790 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:06:51,710 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:06:51,713 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:51,713 INFO sqlalchemy.engine.Engine 
+        INSERT INTO geofences (geofence_id, zone_name, boundary_polygon, is_active)
+        VALUES 
+        ('11111111-1111-1111-1111-111111111111', 'Koramangala Logistics Hub', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6150 12.9280, 77.6350 12.9280, 77.6350 12.9420, 77.6150 12.9420, 77.6150 12.9280)))', 4326), TRUE),
+        ('22222222-2222-2222-2222-222222222222', 'Indiranagar Express Zone', 
+         ST_GeomFromText('MULTIPOLYGON(((77.6300 12.9700, 77.6500 12.9700, 77.6500 12.9850, 77.6300 12.9850, 77.6300 12.9700)))', 4326), TRUE)
+        ON CONFLICT (geofence_id) DO NOTHING;
+    
+2026-09-23 06:06:51,713 INFO sqlalchemy.engine.Engine [cached since 1657s ago] ()
+INFO:     127.0.0.1:35810 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 06:06:51,715 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:06:51,716 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:06:51,716 INFO sqlalchemy.engine.Engine [cached since 1657s ago] (50,)
+2026-09-23 06:06:51,716 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:35824 - "POST /api/v1/seed-geofences HTTP/1.1" 200 OK
+2026-09-23 06:06:51,718 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:35840 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:07:21,138 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:21,138 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:21,138 INFO sqlalchemy.engine.Engine [cached since 1497s ago] (1,)
+2026-09-23 06:07:21,139 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:21,139 INFO sqlalchemy.engine.Engine [cached since 1497s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:21,140 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:21,143 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:21,143 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:21,143 INFO sqlalchemy.engine.Engine [cached since 1684s ago] (1,)
+2026-09-23 06:07:21,144 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:37536 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:21,149 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:21,149 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:21,149 INFO sqlalchemy.engine.Engine [cached since 1684s ago] (10,)
+2026-09-23 06:07:21,150 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:37536 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:43,678 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:43,678 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:43,678 INFO sqlalchemy.engine.Engine [cached since 1516s ago] (1,)
+2026-09-23 06:07:43,680 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:43,680 INFO sqlalchemy.engine.Engine [cached since 1516s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:43,681 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:43,713 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:43,713 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:43,713 INFO sqlalchemy.engine.Engine [cached since 1704s ago] (1,)
+2026-09-23 06:07:43,715 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:43,723 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:43,724 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:43,724 INFO sqlalchemy.engine.Engine [cached since 1704s ago] (10,)
+2026-09-23 06:07:43,730 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:44,431 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:44,432 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:44,432 INFO sqlalchemy.engine.Engine [cached since 1517s ago] (1,)
+2026-09-23 06:07:44,434 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:44,434 INFO sqlalchemy.engine.Engine [cached since 1517s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:44,436 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:44,781 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:44,781 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:44,781 INFO sqlalchemy.engine.Engine [cached since 1705s ago] (1,)
+2026-09-23 06:07:44,782 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:44,787 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:44,787 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:44,788 INFO sqlalchemy.engine.Engine [cached since 1705s ago] (10,)
+2026-09-23 06:07:44,789 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:45,011 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:45,011 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:45,012 INFO sqlalchemy.engine.Engine [cached since 1518s ago] (1,)
+2026-09-23 06:07:45,014 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:45,014 INFO sqlalchemy.engine.Engine [cached since 1518s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:45,016 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:45,048 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:45,048 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:45,048 INFO sqlalchemy.engine.Engine [cached since 1705s ago] (1,)
+2026-09-23 06:07:45,051 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:45,059 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:45,059 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:45,059 INFO sqlalchemy.engine.Engine [cached since 1705s ago] (10,)
+2026-09-23 06:07:45,062 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:45,375 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:45,375 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:45,375 INFO sqlalchemy.engine.Engine [cached since 1518s ago] (1,)
+2026-09-23 06:07:45,377 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:45,378 INFO sqlalchemy.engine.Engine [cached since 1518s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:45,379 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:45,411 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:45,411 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:45,411 INFO sqlalchemy.engine.Engine [cached since 1706s ago] (1,)
+2026-09-23 06:07:45,413 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:45,420 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:45,421 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:45,421 INFO sqlalchemy.engine.Engine [cached since 1706s ago] (10,)
+2026-09-23 06:07:45,424 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:49,812 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:49,813 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:49,813 INFO sqlalchemy.engine.Engine [cached since 1523s ago] (1,)
+2026-09-23 06:07:49,815 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:49,815 INFO sqlalchemy.engine.Engine [cached since 1523s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:49,817 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:49,849 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:49,849 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:49,849 INFO sqlalchemy.engine.Engine [cached since 1710s ago] (1,)
+2026-09-23 06:07:49,851 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:49,859 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:49,860 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:49,860 INFO sqlalchemy.engine.Engine [cached since 1710s ago] (10,)
+2026-09-23 06:07:49,864 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:50,538 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:50,538 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:50,538 INFO sqlalchemy.engine.Engine [cached since 1523s ago] (1,)
+2026-09-23 06:07:50,540 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:50,541 INFO sqlalchemy.engine.Engine [cached since 1523s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:50,542 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:50,545 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:50,546 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:50,546 INFO sqlalchemy.engine.Engine [cached since 1711s ago] (1,)
+2026-09-23 06:07:50,550 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:50,559 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:50,559 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:50,559 INFO sqlalchemy.engine.Engine [cached since 1711s ago] (10,)
+2026-09-23 06:07:50,562 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:50,965 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:50,966 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:50,966 INFO sqlalchemy.engine.Engine [cached since 1524s ago] (1,)
+2026-09-23 06:07:50,968 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:50,968 INFO sqlalchemy.engine.Engine [cached since 1524s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:50,969 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:50,973 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:50,974 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:50,974 INFO sqlalchemy.engine.Engine [cached since 1711s ago] (1,)
+2026-09-23 06:07:50,976 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:50,985 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:50,985 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:50,986 INFO sqlalchemy.engine.Engine [cached since 1711s ago] (10,)
+2026-09-23 06:07:50,989 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:51,328 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:51,329 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:51,329 INFO sqlalchemy.engine.Engine [cached since 1524s ago] (1,)
+2026-09-23 06:07:51,331 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:51,331 INFO sqlalchemy.engine.Engine [cached since 1524s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:51,333 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:51,365 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:51,365 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:51,365 INFO sqlalchemy.engine.Engine [cached since 1712s ago] (1,)
+2026-09-23 06:07:51,368 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:51,376 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:51,377 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:51,377 INFO sqlalchemy.engine.Engine [cached since 1712s ago] (10,)
+2026-09-23 06:07:51,380 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:52,010 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,011 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,011 INFO sqlalchemy.engine.Engine [cached since 1525s ago] (1,)
+2026-09-23 06:07:52,013 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:52,013 INFO sqlalchemy.engine.Engine [cached since 1525s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:52,015 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:52,046 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,046 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,046 INFO sqlalchemy.engine.Engine [cached since 1712s ago] (1,)
+2026-09-23 06:07:52,048 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:52,055 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,056 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,056 INFO sqlalchemy.engine.Engine [cached since 1712s ago] (10,)
+2026-09-23 06:07:52,058 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:52,528 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,528 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,528 INFO sqlalchemy.engine.Engine [cached since 1525s ago] (1,)
+2026-09-23 06:07:52,530 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:52,531 INFO sqlalchemy.engine.Engine [cached since 1525s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:52,533 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:52,564 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,564 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,565 INFO sqlalchemy.engine.Engine [cached since 1713s ago] (1,)
+2026-09-23 06:07:52,567 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:52,575 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,575 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,575 INFO sqlalchemy.engine.Engine [cached since 1713s ago] (10,)
+2026-09-23 06:07:52,578 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:07:52,910 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,911 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,911 INFO sqlalchemy.engine.Engine [cached since 1526s ago] (1,)
+2026-09-23 06:07:52,913 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:07:52,914 INFO sqlalchemy.engine.Engine [cached since 1526s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:07:52,915 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:07:52,947 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,947 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,948 INFO sqlalchemy.engine.Engine [cached since 1713s ago] (1,)
+2026-09-23 06:07:52,950 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:07:52,958 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:07:52,958 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:07:52,958 INFO sqlalchemy.engine.Engine [cached since 1713s ago] (10,)
+2026-09-23 06:07:52,961 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57710 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:12:19,573 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:12:19,574 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:12:19,574 INFO sqlalchemy.engine.Engine [cached since 1958s ago] (50,)
+2026-09-23 06:12:19,577 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:53382 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:13:46,459 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:13:46,459 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:13:46,459 INFO sqlalchemy.engine.Engine [cached since 2037s ago] (50,)
+2026-09-23 06:13:46,461 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:53066 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44386 - "OPTIONS /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 06:13:54,728 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:13:54,728 INFO sqlalchemy.engine.Engine TRUNCATE TABLE spatial_logs, audit_reports RESTART IDENTITY CASCADE;
+2026-09-23 06:13:54,728 INFO sqlalchemy.engine.Engine [cached since 2039s ago] ()
+2026-09-23 06:13:54,745 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:44386 - "DELETE /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 06:13:54,797 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:13:54,797 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:13:54,798 INFO sqlalchemy.engine.Engine [cached since 2045s ago] (50,)
+2026-09-23 06:13:54,801 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:44386 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:13:54,850 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:13:54,850 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:13:54,850 INFO sqlalchemy.engine.Engine [cached since 2045s ago] (10,)
+2026-09-23 06:13:54,853 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:44386 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:44,484 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:44,485 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 06:17:44,485 INFO sqlalchemy.engine.Engine [cached since 2232s ago (insertmanyvalues) 1/1 (ordered)] (12.984208, 77.647847, 'tdr1ygt', datetime.datetime(2026, 9, 23, 6, 17, 44, 485395), 12.929827, 77.617577, 'tdr1w1z', datetime.datetime(2026, 9, 23, 6, 17, 44, 485401), 12.914429, 77.643818, 'tdr1qz4', datetime.datetime(2026, 9, 23, 6, 17, 44, 485403), 12.934656, 77.618768, 'tdr1w68', datetime.datetime(2026, 9, 23, 6, 17, 44, 485405), 12.942571, 77.629714, 'tdr1ws0', datetime.datetime(2026, 9, 23, 6, 17, 44, 485407), 12.90946, 77.639301, 'tdr1qwp', datetime.datetime(2026, 9, 23, 6, 17, 44, 485408), 12.975217, 77.63995, 'tdr1ydp', datetime.datetime(2026, 9, 23, 6, 17, 44, 485410), 12.98289, 77.639977, 'tdr1yer', datetime.datetime(2026, 9, 23, 6, 17, 44, 485412), 12.908456, 77.635375, 'tdr1qtu', datetime.datetime(2026, 9, 23, 6, 17, 44, 485414), 12.91613, 77.6483, 'tdr1qzm', datetime.datetime(2026, 9, 23, 6, 17, 44, 485416), 12.98373, 77.63464, 'tdr1yee', datetime.datetime(2026, 9, 23, 6, 17, 44, 485417), 12.918282, 77.637046, 'tdr1qxt', datetime.datetime(2026, 9, 23, 6, 17, 44, 485419), 12.933103, 77.631914, 'tdr1wd3', datetime.datetime(2026, 9, 23, 6, 17, 44, 485420), 12.935904, 77.617642, 'tdr1w4z', datetime.datetime(2026, 9, 23, 6, 17, 44, 485422), 12.921264, 77.645461, 'tdr1wb5', datetime.datetime(2026, 9, 23, 6, 17, 44, 485423))
+2026-09-23 06:17:44,490 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:45524 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 06:17:44,501 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:44,502 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:44,502 INFO sqlalchemy.engine.Engine [cached since 2256s ago] (50,)
+2026-09-23 06:17:44,505 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:17:45,816 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:45,816 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:45,817 INFO sqlalchemy.engine.Engine [cached since 2070s ago] (1,)
+2026-09-23 06:17:45,819 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:45,819 INFO sqlalchemy.engine.Engine [cached since 2070s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:45,822 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:45,826 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:45,826 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:45,826 INFO sqlalchemy.engine.Engine [cached since 2257s ago] (1,)
+2026-09-23 06:17:45,829 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:45,840 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:45,840 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:45,840 INFO sqlalchemy.engine.Engine [cached since 2257s ago] (10,)
+2026-09-23 06:17:45,843 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:47,684 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:47,684 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:47,684 INFO sqlalchemy.engine.Engine [cached since 2072s ago] (1,)
+2026-09-23 06:17:47,686 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:47,686 INFO sqlalchemy.engine.Engine [cached since 2072s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:47,688 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:47,720 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:47,721 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:47,721 INFO sqlalchemy.engine.Engine [cached since 2259s ago] (1,)
+2026-09-23 06:17:47,723 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:47,731 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:47,732 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:47,732 INFO sqlalchemy.engine.Engine [cached since 2259s ago] (10,)
+2026-09-23 06:17:47,734 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:48,308 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:48,308 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:48,308 INFO sqlalchemy.engine.Engine [cached since 2072s ago] (1,)
+2026-09-23 06:17:48,311 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:48,311 INFO sqlalchemy.engine.Engine [cached since 2072s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:48,312 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:48,344 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:48,345 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:48,345 INFO sqlalchemy.engine.Engine [cached since 2260s ago] (1,)
+2026-09-23 06:17:48,347 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:48,355 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:48,356 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:48,356 INFO sqlalchemy.engine.Engine [cached since 2260s ago] (10,)
+2026-09-23 06:17:48,358 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:48,836 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:48,836 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:48,836 INFO sqlalchemy.engine.Engine [cached since 2073s ago] (1,)
+2026-09-23 06:17:48,839 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:48,839 INFO sqlalchemy.engine.Engine [cached since 2073s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:48,842 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:48,874 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:48,874 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:48,874 INFO sqlalchemy.engine.Engine [cached since 2260s ago] (1,)
+2026-09-23 06:17:48,877 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:48,885 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:48,886 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:48,886 INFO sqlalchemy.engine.Engine [cached since 2260s ago] (10,)
+2026-09-23 06:17:48,889 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:49,455 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:49,456 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:49,456 INFO sqlalchemy.engine.Engine [cached since 2073s ago] (1,)
+2026-09-23 06:17:49,458 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:49,458 INFO sqlalchemy.engine.Engine [cached since 2073s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:49,460 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:49,463 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:49,464 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:49,464 INFO sqlalchemy.engine.Engine [cached since 2261s ago] (1,)
+2026-09-23 06:17:49,466 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:49,475 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:49,476 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:49,476 INFO sqlalchemy.engine.Engine [cached since 2261s ago] (10,)
+2026-09-23 06:17:49,479 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:49,971 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:49,971 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:49,972 INFO sqlalchemy.engine.Engine [cached since 2074s ago] (1,)
+2026-09-23 06:17:49,974 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:49,974 INFO sqlalchemy.engine.Engine [cached since 2074s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:49,977 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:49,981 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:49,981 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:49,981 INFO sqlalchemy.engine.Engine [cached since 2261s ago] (1,)
+2026-09-23 06:17:49,984 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:49,994 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:49,995 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:49,995 INFO sqlalchemy.engine.Engine [cached since 2261s ago] (10,)
+2026-09-23 06:17:49,998 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:50,519 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:50,519 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:50,519 INFO sqlalchemy.engine.Engine [cached since 2074s ago] (1,)
+2026-09-23 06:17:50,522 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:50,522 INFO sqlalchemy.engine.Engine [cached since 2074s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:50,524 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:50,557 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:50,557 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:50,557 INFO sqlalchemy.engine.Engine [cached since 2262s ago] (1,)
+2026-09-23 06:17:50,559 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:50,567 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:50,568 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:50,568 INFO sqlalchemy.engine.Engine [cached since 2262s ago] (10,)
+2026-09-23 06:17:50,570 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:17:51,086 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:51,087 INFO sqlalchemy.engine.Engine SELECT geofences.geofence_id, geofences.zone_name, geofences.is_active 
+FROM geofences 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:51,087 INFO sqlalchemy.engine.Engine [cached since 2075s ago] (1,)
+2026-09-23 06:17:51,089 INFO sqlalchemy.engine.Engine CALL sp_generate_privacy_audit(CAST($1 AS uuid), $2)
+2026-09-23 06:17:51,089 INFO sqlalchemy.engine.Engine [cached since 2075s ago] ('11111111-1111-1111-1111-111111111111', 1.5)
+2026-09-23 06:17:51,091 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-23 06:17:51,123 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:51,123 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:51,123 INFO sqlalchemy.engine.Engine [cached since 2263s ago] (1,)
+2026-09-23 06:17:51,125 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "POST /api/v1/trigger-audit?epsilon=1.5 HTTP/1.1" 200 OK
+2026-09-23 06:17:51,133 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:17:51,134 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:17:51,134 INFO sqlalchemy.engine.Engine [cached since 2263s ago] (10,)
+2026-09-23 06:17:51,136 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:45524 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
+2026-09-23 06:28:59,640 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:28:59,641 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 06:28:59,642 INFO sqlalchemy.engine.Engine [cached since 2849s ago (insertmanyvalues) 1/1 (ordered)] (12.980176, 77.637569, 'tdr1ydv', datetime.datetime(2026, 9, 23, 6, 28, 59, 641692), 12.917616, 77.645332, 'tdr1qze', datetime.datetime(2026, 9, 23, 6, 28, 59, 641698), 12.918026, 77.638349, 'tdr1qxw', datetime.datetime(2026, 9, 23, 6, 28, 59, 641700), 12.933637, 77.62154, 'tdr1w66', datetime.datetime(2026, 9, 23, 6, 28, 59, 641701), 12.921856, 77.636744, 'tdr1w8m', datetime.datetime(2026, 9, 23, 6, 28, 59, 641703), 12.906571, 77.644423, 'tdr1qvd', datetime.datetime(2026, 9, 23, 6, 28, 59, 641704), 12.927402, 77.629377, 'tdr1w3r', datetime.datetime(2026, 9, 23, 6, 28, 59, 641706), 12.930745, 77.62478, 'tdr1w3u', datetime.datetime(2026, 9, 23, 6, 28, 59, 641708), 12.943056, 77.621954, 'tdr1wk4', datetime.datetime(2026, 9, 23, 6, 28, 59, 641709), 12.934216, 77.620539, 'tdr1w69', datetime.datetime(2026, 9, 23, 6, 28, 59, 641711), 12.970782, 77.636232, 'tdr1y9k', datetime.datetime(2026, 9, 23, 6, 28, 59, 641713), 12.913542, 77.636123, 'tdr1qwu', datetime.datetime(2026, 9, 23, 6, 28, 59, 641714), 12.980811, 77.638089, 'tdr1yen', datetime.datetime(2026, 9, 23, 6, 28, 59, 641716), 12.915366, 77.643419, 'tdr1qz4', datetime.datetime(2026, 9, 23, 6, 28, 59, 641717), 12.937145, 77.625111, 'tdr1w7h', datetime.datetime(2026, 9, 23, 6, 28, 59, 641719))
+2026-09-23 06:28:59,647 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:51014 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 06:28:59,661 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:28:59,661 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:28:59,662 INFO sqlalchemy.engine.Engine [cached since 2874s ago] (50,)
+2026-09-23 06:28:59,665 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:51014 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:28:59,741 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:28:59,742 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 06:28:59,742 INFO sqlalchemy.engine.Engine [cached since 2849s ago (insertmanyvalues) 1/1 (ordered)] (12.980366, 77.635026, 'tdr1yeh', datetime.datetime(2026, 9, 23, 6, 28, 59, 742131), 12.932345, 77.617613, 'tdr1w4r', datetime.datetime(2026, 9, 23, 6, 28, 59, 742136), 12.937172, 77.629977, 'tdr1we0', datetime.datetime(2026, 9, 23, 6, 28, 59, 742138), 12.984417, 77.645954, 'tdr1ygs', datetime.datetime(2026, 9, 23, 6, 28, 59, 742140), 12.91596, 77.641829, 'tdr1qz3', datetime.datetime(2026, 9, 23, 6, 28, 59, 742142), 12.93231, 77.623398, 'tdr1w67', datetime.datetime(2026, 9, 23, 6, 28, 59, 742144), 12.938455, 77.618987, 'tdr1w72', datetime.datetime(2026, 9, 23, 6, 28, 59, 742146), 12.931865, 77.622646, 'tdr1w65', datetime.datetime(2026, 9, 23, 6, 28, 59, 742147), 12.930756, 77.623824, 'tdr1w3g', datetime.datetime(2026, 9, 23, 6, 28, 59, 742149), 12.981848, 77.639136, 'tdr1yer', datetime.datetime(2026, 9, 23, 6, 28, 59, 742150), 12.936443, 77.621708, 'tdr1w74', datetime.datetime(2026, 9, 23, 6, 28, 59, 742152), 12.908243, 77.637273, 'tdr1qtv', datetime.datetime(2026, 9, 23, 6, 28, 59, 742153), 12.913236, 77.642902, 'tdr1qyc', datetime.datetime(2026, 9, 23, 6, 28, 59, 742155), 12.937847, 77.630282, 'tdr1we2', datetime.datetime(2026, 9, 23, 6, 28, 59, 742156), 12.912657, 77.644052, 'tdr1qyd', datetime.datetime(2026, 9, 23, 6, 28, 59, 742158))
+2026-09-23 06:28:59,745 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:51014 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 06:28:59,797 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:28:59,798 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:28:59,798 INFO sqlalchemy.engine.Engine [cached since 2874s ago] (50,)
+2026-09-23 06:28:59,801 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:51014 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:28:59,880 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:28:59,881 INFO sqlalchemy.engine.Engine INSERT INTO spatial_logs (raw_lat, raw_lon, masked_geohash, recorded_at) SELECT p0::FLOAT, p1::FLOAT, p2::VARCHAR, p3::TIMESTAMP WITH TIME ZONE FROM (VALUES ($1::FLOAT, $2::FLOAT, $3::VARCHAR, $4::TIMESTAMP WITH TIME ZONE, 0), ($5::FLOAT, $6::FLOAT,  ... 1037 characters truncated ... 3, sen_counter) ORDER BY sen_counter RETURNING spatial_logs.log_id, spatial_logs.log_id AS log_id__1
+2026-09-23 06:28:59,881 INFO sqlalchemy.engine.Engine [cached since 2850s ago (insertmanyvalues) 1/1 (ordered)] (12.911168, 77.647939, 'tdr1qym', datetime.datetime(2026, 9, 23, 6, 28, 59, 881008), 12.907067, 77.641046, 'tdr1qv8', datetime.datetime(2026, 9, 23, 6, 28, 59, 881040), 12.982493, 77.644248, 'tdr1yg6', datetime.datetime(2026, 9, 23, 6, 28, 59, 881045), 12.911279, 77.6352, 'tdr1qwk', datetime.datetime(2026, 9, 23, 6, 28, 59, 881047), 12.907751, 77.647861, 'tdr1qvv', datetime.datetime(2026, 9, 23, 6, 28, 59, 881048), 12.907968, 77.646726, 'tdr1qvu', datetime.datetime(2026, 9, 23, 6, 28, 59, 881050), 12.978696, 77.636453, 'tdr1ydt', datetime.datetime(2026, 9, 23, 6, 28, 59, 881052), 12.980942, 77.639258, 'tdr1yep', datetime.datetime(2026, 9, 23, 6, 28, 59, 881054), 12.972181, 77.633634, 'tdr1y9e', datetime.datetime(2026, 9, 23, 6, 28, 59, 881055), 12.936976, 77.625671, 'tdr1w7j', datetime.datetime(2026, 9, 23, 6, 28, 59, 881057), 12.939051, 77.625715, 'tdr1w7m', datetime.datetime(2026, 9, 23, 6, 28, 59, 881059), 12.921624, 77.635097, 'tdr1w8k', datetime.datetime(2026, 9, 23, 6, 28, 59, 881070), 12.914521, 77.635006, 'tdr1qxh', datetime.datetime(2026, 9, 23, 6, 28, 59, 881073), 12.978693, 77.642369, 'tdr1yf9', datetime.datetime(2026, 9, 23, 6, 28, 59, 881075), 12.941753, 77.630499, 'tdr1web', datetime.datetime(2026, 9, 23, 6, 28, 59, 881077))
+2026-09-23 06:28:59,884 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:51014 - "POST /api/v1/simulate-pings?count=15 HTTP/1.1" 200 OK
+2026-09-23 06:28:59,966 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:28:59,966 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:28:59,966 INFO sqlalchemy.engine.Engine [cached since 2874s ago] (50,)
+2026-09-23 06:28:59,969 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:51014 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49558 - "OPTIONS /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 06:32:47,719 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:32:47,719 INFO sqlalchemy.engine.Engine TRUNCATE TABLE spatial_logs, audit_reports RESTART IDENTITY CASCADE;
+2026-09-23 06:32:47,719 INFO sqlalchemy.engine.Engine [cached since 3083s ago] ()
+2026-09-23 06:32:47,740 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:49558 - "DELETE /api/v1/reset-pings HTTP/1.1" 200 OK
+2026-09-23 06:32:47,791 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:32:47,792 INFO sqlalchemy.engine.Engine SELECT spatial_logs.log_id, spatial_logs.masked_geohash, spatial_logs.recorded_at 
+FROM spatial_logs ORDER BY spatial_logs.log_id DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:32:47,792 INFO sqlalchemy.engine.Engine [cached since 3089s ago] (50,)
+2026-09-23 06:32:47,794 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:49558 - "GET /api/v1/spatial-logs HTTP/1.1" 200 OK
+2026-09-23 06:32:47,843 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-23 06:32:47,844 INFO sqlalchemy.engine.Engine SELECT audit_reports.report_id, audit_reports.geofence_id, audit_reports.true_count, audit_reports.laplacian_noise, audit_reports.reported_count, audit_reports.generated_at 
+FROM audit_reports ORDER BY audit_reports.generated_at DESC 
+ LIMIT $1::INTEGER
+2026-09-23 06:32:47,844 INFO sqlalchemy.engine.Engine [cached since 3089s ago] (10,)
+2026-09-23 06:32:47,847 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:49558 - "GET /api/v1/audit-reports HTTP/1.1" 200 OK
