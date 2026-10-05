@@ -189,3 +189,29 @@
 .dark-map .leaflet-tile-pane {
   filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3);
 }
+
+/* Base Leaflet Map Overrides */
+.leaflet-container {
+  background-color: #0B0F17 !important;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+
+/* Custom Scrollbar Styling for Sidebar & Tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4B5563;
+}
