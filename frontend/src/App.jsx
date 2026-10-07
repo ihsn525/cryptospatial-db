@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import './App.css';
 import axios from 'axios';
 import {
   ShieldAlert, Radio, Activity, RefreshCw, Zap,
@@ -9,38 +10,48 @@ import {
 
 const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
-// React Error Boundary Component
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+// Helper to generate dynamic driver IDs
+const generateDriverId = () => `DRV-${Math.floor(100 + Math.random() * 900)}`;
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
+// Geohash Encoder Function for Edge Privacy Masking
+function encodeGeohash(latitude, longitude, precision = 7) {
+  const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+  let latInterval = [-90.0, 90.0];
+  let lonInterval = [-180.0, 180.0];
+  let geohash = '';
+  let bits = [16, 8, 4, 2, 1];
+  let bit = 0;
+  let ch = 0;
+  let even = true;
 
-  componentDidCatch(error, errorInfo) {
-    console.error("React Error Boundary caught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '30px', backgroundColor: '#111827', color: '#F87171', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
-          <h2 style={{ margin: '0 0 10px 0' }}>Application UI Error Boundary Caught An Exception</h2>
-          <p style={{ color: '#D1D5DB', fontSize: '14px' }}>{this.state.error?.toString()}</p>
-          <button
-            onClick={() => { localStorage.clear(); window.location.reload(); }}
-            style={{ padding: '10px 16px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '16px', fontWeight: '600' }}
-          >
-            Reset Dashboard
-          </button>
-        </div>
-      );
+  while (geohash.length < precision) {
+    if (even) {
+      let mid = (lonInterval[0] + lonInterval[1]) / 2;
+      if (longitude > mid) {
+        ch |= bits[bit];
+        lonInterval[0] = mid;
+      } else {
+        lonInterval[1] = mid;
+      }
+    } else {
+      let mid = (latInterval[0] + latInterval[1]) / 2;
+      if (latitude > mid) {
+        ch |= bits[bit];
+        latInterval[0] = mid;
+      } else {
+        latInterval[1] = mid;
+      }
     }
-    return this.props.children;
+    even = !even;
+    if (bit < 4) {
+      bit++;
+    } else {
+      geohash += BASE32[ch];
+      bit = 0;
+      ch = 0;
+    }
   }
+  return geohash;
 }
 
 // Geohash Decoder Function
@@ -76,10 +87,55 @@ function decodeGeohash(geohash) {
   return [lat, lon];
 }
 
+// React Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("React Error Boundary caught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '30px', backgroundColor: '#111827', color: '#F87171', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
+          <h2 style={{ margin: '0 0 10px 0' }}>Application UI Error Boundary Caught An Exception</h2>
+          <p style={{ color: '#D1D5DB', fontSize: '14px' }}>{this.state.error?.toString()}</p>
+          <button
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{ padding: '10px 16px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '16px', fontWeight: '600' }}
+          >
+            Reset Dashboard
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Map Auto-Recenter Controller Component
+function MapRecenter({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
+      map.flyTo(center, 15, { animate: true, duration: 1.0 });
+    }
+  }, [center, map]);
+  return null;
+}
+
 function MapClickHandler({ mapMode, onMapClick }) {
   useMapEvents({
     click(e) {
-      if (mapMode !== 'none' && e.latlng) {
+      if (e.latlng && mapMode !== 'geofence') {
         onMapClick([e.latlng.lat, e.latlng.lng]);
       }
     }
@@ -96,6 +152,11 @@ function MainApp() {
   const [loading, setLoading] = useState(false);
   const [lastAudit, setLastAudit] = useState(null);
   const [activeGeofences, setActiveGeofences] = useState([]);
+
+  // Map Viewport and Focal Marker States
+  const [mapCenter, setMapCenter] = useState([12.9352, 77.6245]);
+  const [latestIngestedPing, setLatestIngestedPing] = useState(null);
+  const [selectedPin, setSelectedPin] = useState(null);
 
   // Automated Background Audit State
   const [autoAuditState, setAutoAuditState] = useState({
@@ -115,7 +176,8 @@ function MainApp() {
   const [drawnGeofencePoints, setDrawnGeofencePoints] = useState([]);
   const [customZoneName, setCustomZoneName] = useState('Koramangala Extension');
 
-  const [customDriverId, setCustomDriverId] = useState('DRV-888');
+  // Custom Ingestion Inputs with Dynamic Driver ID
+  const [customDriverId, setCustomDriverId] = useState(generateDriverId());
   const [customLat, setCustomLat] = useState('12.9352');
   const [customLon, setCustomLon] = useState('77.6245');
   const [validationError, setValidationError] = useState('');
@@ -133,7 +195,7 @@ function MainApp() {
 
   const fetchLogs = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/spatial-logs`);
+      const res = await axios.get(`${API_BASE}/spatial-logs?limit=100`);
       if (res.data && Array.isArray(res.data.data)) {
         setLogs(res.data.data);
       }
@@ -201,33 +263,38 @@ function MainApp() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleMapClick = async (coords) => {
+  const handleMapClick = (coords) => {
     if (!coords || isNaN(coords[0]) || isNaN(coords[1])) return;
 
-    if (mapMode === 'driver') {
-      setCustomLat(coords[0].toFixed(6));
-      setCustomLon(coords[1].toFixed(6));
-      setMapMode('none');
-      setValidationError('');
-    } else if (mapMode === 'geofence') {
+    if (mapMode === 'geofence') {
       const updated = [...drawnGeofencePoints, coords];
       setDrawnGeofencePoints(updated);
 
       if (updated.length === 4) {
         setLoading(true);
-        try {
-          await axios.post(`${API_BASE}/geofences/custom`, {
-            zone_name: customZoneName || `Hub-${Math.floor(Math.random() * 1000)}`,
-            coordinates: updated
-          });
+        axios.post(`${API_BASE}/geofences/custom`, {
+          zone_name: customZoneName || `Hub-${Math.floor(Math.random() * 1000)}`,
+          coordinates: updated
+        }).then(async () => {
           await fetchGeofences();
           alert(`Delivery Zone '${customZoneName}' saved to PostGIS!`);
-        } catch (err) {
+        }).catch(() => {
           alert('Failed to save custom geofence');
-        }
-        setDrawnGeofencePoints([]);
+        }).finally(() => {
+          setDrawnGeofencePoints([]);
+          setMapMode('none');
+          setLoading(false);
+        });
+      }
+    } else {
+      const newLat = coords[0].toFixed(6);
+      const newLon = coords[1].toFixed(6);
+      setCustomLat(newLat);
+      setCustomLon(newLon);
+      setSelectedPin([parseFloat(newLat), parseFloat(newLon)]);
+      setValidationError('');
+      if (mapMode === 'driver') {
         setMapMode('none');
-        setLoading(false);
       }
     }
   };
@@ -303,17 +370,36 @@ function MainApp() {
     e.preventDefault();
     setValidationError('');
     setLoading(true);
+
+    const lat = parseFloat(customLat);
+    const lon = parseFloat(customLon);
+
     try {
-      await axios.post(`${API_BASE}/driver-pings/ingest`, {
+      const res = await axios.post(`${API_BASE}/driver-pings/ingest`, {
         driver_id: customDriverId,
-        latitude: parseFloat(customLat),
-        longitude: parseFloat(customLon),
+        latitude: lat,
+        longitude: lon,
         enforce_boundary_check: true
       });
+
+      // Refresh database records
       await fetchLogs();
       await fetchIndexMetadata();
       await pollAutomatedAudit();
-      alert(`Driver ${customDriverId} validated & ingested inside active zone!`);
+
+      // Pan map and focus blue marker at newly ingested position
+      setLatestIngestedPing({
+        driver_id: customDriverId,
+        lat: lat,
+        lon: lon,
+        masked_geohash: res.data.masked_geohash || encodeGeohash(lat, lon, 7)
+      });
+      setMapCenter([lat, lon]);
+      setSelectedPin(null);
+
+      // Auto-generate fresh Driver ID for next ingestion
+      setCustomDriverId(generateDriverId());
+
     } catch (err) {
       if (err.response && err.response.data && err.response.data.detail) {
         setValidationError(err.response.data.detail);
@@ -331,6 +417,8 @@ function MainApp() {
       await axios.delete(`${API_BASE}/reset-pings`);
       setLastAudit(null);
       setBenchmarkData(null);
+      setLatestIngestedPing(null);
+      setSelectedPin(null);
       await fetchLogs();
       await fetchReports();
       await fetchIndexMetadata();
@@ -342,50 +430,50 @@ function MainApp() {
   };
 
   return (
-    <div style={styles.container}>
-      {/* HEADER WITH INTEGRATED TOP-RIGHT AUTOMATED AUDIT DISPLAY */}
-      <header style={styles.header}>
-        <div style={styles.brand}>
+    <div className="app-container">
+      {/* HEADER WITH TOP-RIGHT AUTOMATED AUDIT DISPLAY */}
+      <header className="app-header">
+        <div className="app-brand">
           <ShieldAlert color="#60A5FA" size={28} />
           <div>
-            <h1 style={styles.title}>CryptoSpatial-DB Engine</h1>
-            <p style={styles.subtitle}>Privacy-Preserving Geospatial Auditing • Geo-Indistinguishability</p>
+            <h1 className="app-title">CryptoSpatial-DB Engine</h1>
+            <p className="app-subtitle">Privacy-Preserving Geospatial Auditing • Geo-Indistinguishability</p>
           </div>
         </div>
 
         {/* NAVIGATION TABS */}
-        <div style={styles.tabContainer}>
+        <div className="tab-container">
           <button
             onClick={() => setActiveTab('dashboard')}
-            style={activeTab === 'dashboard' ? styles.tabActive : styles.tabInactive}
+            className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
           >
             <LayoutDashboard size={15} /> Operational Dashboard
           </button>
           <button
             onClick={() => { setActiveTab('benchmarks'); if (!benchmarkData) handleRunBenchmark(); }}
-            style={activeTab === 'benchmarks' ? styles.tabActive : styles.tabInactive}
+            className={`tab-btn ${activeTab === 'benchmarks' ? 'active' : ''}`}
           >
             <BarChart3 size={15} /> Benchmarking Analyzer
           </button>
         </div>
 
         {/* TOP-RIGHT AUTOMATED BACKGROUND AUDIT WIDGET */}
-        <div style={styles.headerAuditCard}>
-          <div style={styles.headerAuditHeader}>
+        <div className="header-audit-card">
+          <div className="header-audit-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={styles.pulseDot}></span>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: '#34D399' }}>Auto Audit Active</span>
+              <span className="pulse-dot"></span>
+              <span className="header-audit-status">Auto Audit Active</span>
             </div>
-            <span style={styles.headerAuditTime}><Clock size={11} /> {autoAuditState.lastRunTime}</span>
+            <span className="header-audit-time"><Clock size={11} /> {autoAuditState.lastRunTime}</span>
           </div>
-          <div style={styles.headerAuditMetrics}>
-            <span style={styles.headerMetricItem}><b>Zone:</b> {autoAuditState.geofence_zone}</span>
-            <span style={styles.headerMetricDivider}>•</span>
-            <span style={styles.headerMetricItem}><b>True:</b> {autoAuditState.true_count}</span>
-            <span style={styles.headerMetricDivider}>•</span>
-            <span style={styles.headerMetricItem}><b>Noise:</b> <span style={{ color: '#F59E0B' }}>{autoAuditState.laplacian_noise > 0 ? `+${autoAuditState.laplacian_noise}` : autoAuditState.laplacian_noise}</span></span>
-            <span style={styles.headerMetricDivider}>•</span>
-            <span style={styles.headerMetricItem}><b>Reported:</b> <span style={{ color: '#34D399', fontWeight: '700' }}>{autoAuditState.reported_count}</span></span>
+          <div className="header-audit-metrics">
+            <span className="header-metric-item"><b>Zone:</b> <span className="header-metric-zone" title={autoAuditState.geofence_zone}>{autoAuditState.geofence_zone}</span></span>
+            <span className="header-metric-divider">•</span>
+            <span className="header-metric-item"><b>True:</b> {autoAuditState.true_count}</span>
+            <span className="header-metric-divider">•</span>
+            <span className="header-metric-item"><b>Noise:</b> <span style={{ color: '#F59E0B' }}>{autoAuditState.laplacian_noise > 0 ? `+${autoAuditState.laplacian_noise}` : autoAuditState.laplacian_noise}</span></span>
+            <span className="header-metric-divider">•</span>
+            <span className="header-metric-item"><b>Reported:</b> <span style={{ color: '#34D399', fontWeight: '700' }}>{autoAuditState.reported_count}</span></span>
           </div>
         </div>
       </header>
@@ -393,76 +481,76 @@ function MainApp() {
       {/* TAB 1: OPERATIONAL DASHBOARD */}
       {activeTab === 'dashboard' && (
         <>
-          <div style={styles.mainGrid}>
-            <div style={styles.sidebar}>
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}><Zap size={18} /> Simulation & Audit Controls</h3>
-                <button onClick={handleSimulatePings} disabled={loading} style={styles.btnPrimary}>
+          <div className="main-grid">
+            <div className="sidebar">
+              <div className="card">
+                <h3 className="card-title"><Zap size={18} /> Simulation & Audit Controls</h3>
+                <button onClick={handleSimulatePings} disabled={loading} className="btn-primary">
                   <Radio size={16} /> Simulate 15 Pings Across All Zones
                 </button>
-                <button onClick={handleTriggerAudit} disabled={loading} style={styles.btnDanger}>
+                <button onClick={handleTriggerAudit} disabled={loading} className="btn-danger">
                   <ShieldAlert size={16} /> Audit All Active Zones (Laplace Noise)
                 </button>
-                <button onClick={() => { setActiveTab('benchmarks'); handleRunBenchmark(); }} disabled={loading} style={styles.btnSuccess}>
+                <button onClick={() => { setActiveTab('benchmarks'); handleRunBenchmark(); }} disabled={loading} className="btn-success">
                   <BarChart3 size={16} /> Open Benchmarking Analyzer
                 </button>
-                <button onClick={fetchLogs} style={styles.btnSecondary}>
+                <button onClick={fetchLogs} className="btn-secondary">
                   <RefreshCw size={16} /> Refresh Telemetry
                 </button>
-                <button onClick={handleResetPings} disabled={loading} style={styles.btnOutlineDanger}>
+                <button onClick={handleResetPings} disabled={loading} className="btn-outline-danger">
                   <Trash2 size={16} /> Reset Pings & Audits
                 </button>
               </div>
 
               {/* INTERACTIVE MAP DRAWING MODES */}
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}><MousePointer size={18} /> Delivery Zone Creator</h3>
+              <div className="card">
+                <h3 className="card-title"><MousePointer size={18} /> Delivery Zone Creator</h3>
                 <div style={{ marginBottom: '8px' }}>
-                  <label style={styles.label}>Custom Zone Name:</label>
+                  <label className="input-label">Custom Zone Name:</label>
                   <input
                     type="text"
                     value={customZoneName}
                     onChange={e => setCustomZoneName(e.target.value)}
-                    style={styles.inputMini}
+                    className="input-mini"
                   />
                 </div>
                 <button
                   onClick={() => { setMapMode(mapMode === 'geofence' ? 'none' : 'geofence'); setDrawnGeofencePoints([]); }}
-                  style={mapMode === 'geofence' ? styles.btnActiveMode : styles.btnSecondary}
+                  className={mapMode === 'geofence' ? 'btn-active-mode' : 'btn-secondary'}
                 >
                   <PlusCircle size={16} /> {mapMode === 'geofence' ? `Click Map (${drawnGeofencePoints.length}/4 pts)` : 'Draw Custom Zone on Map'}
                 </button>
                 <button
                   onClick={() => setMapMode(mapMode === 'driver' ? 'none' : 'driver')}
-                  style={mapMode === 'driver' ? styles.btnActiveMode : styles.btnSecondary}
+                  className={mapMode === 'driver' ? 'btn-active-mode' : 'btn-secondary'}
                 >
                   <MapPin size={16} /> {mapMode === 'driver' ? 'Click Map to Set Driver Pin' : 'Select Driver Location on Map'}
                 </button>
               </div>
 
               {/* ACTIVE GEOFENCES LIST */}
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}><Database size={18} /> Active Delivery Hubs ({activeGeofences.length})</h3>
-                <div style={styles.geofenceList}>
+              <div className="card">
+                <h3 className="card-title"><Database size={18} /> Active Delivery Hubs ({activeGeofences.length})</h3>
+                <div className="geofence-list">
                   {activeGeofences.map((gf) => (
-                    <div key={gf.geofence_id} style={styles.geofenceItem}>
+                    <div key={gf.geofence_id} className="geofence-item">
                       {editingGeofenceId === gf.geofence_id ? (
-                        <div style={styles.editRow}>
+                        <div className="edit-row">
                           <input
                             type="text"
                             value={editingName}
                             onChange={e => setEditingName(e.target.value)}
-                            style={styles.inputEdit}
+                            className="input-edit"
                           />
-                          <button onClick={() => handleUpdateGeofenceName(gf.geofence_id)} style={styles.btnIconSave}><Check size={14} /></button>
-                          <button onClick={() => setEditingGeofenceId(null)} style={styles.btnIconCancel}><X size={14} /></button>
+                          <button onClick={() => handleUpdateGeofenceName(gf.geofence_id)} className="btn-icon-save"><Check size={14} /></button>
+                          <button onClick={() => setEditingGeofenceId(null)} className="btn-icon-cancel"><X size={14} /></button>
                         </div>
                       ) : (
-                        <div style={styles.viewRow}>
-                          <span style={{ ...styles.geofenceBadge, borderColor: gf.color || '#3B82F6' }}>{gf.name}</span>
-                          <div style={styles.actionBtns}>
-                            <button onClick={() => { setEditingGeofenceId(gf.geofence_id); setEditingName(gf.name); }} style={styles.btnIcon}><Edit2 size={13} /></button>
-                            <button onClick={() => handleDeleteGeofence(gf.geofence_id)} style={styles.btnIconDanger}><Trash2 size={13} /></button>
+                        <div className="view-row">
+                          <span className="geofence-badge" style={{ borderColor: gf.color || '#3B82F6' }}>{gf.name}</span>
+                          <div className="action-btns">
+                            <button onClick={() => { setEditingGeofenceId(gf.geofence_id); setEditingName(gf.name); }} className="btn-icon"><Edit2 size={13} /></button>
+                            <button onClick={() => handleDeleteGeofence(gf.geofence_id)} className="btn-icon-danger"><Trash2 size={13} /></button>
                           </div>
                         </div>
                       )}
@@ -471,32 +559,32 @@ function MainApp() {
                 </div>
               </div>
 
-              <div style={styles.statsGrid}>
-                <div style={styles.statBox}>
-                  <p style={styles.statLabel}>Total Ingested Pings</p>
-                  <h2 style={styles.statValue}>{logs.length}</h2>
+              <div className="stats-grid">
+                <div className="stat-box">
+                  <p className="stat-label">Total Ingested Pings</p>
+                  <h2 className="stat-value">{logs.length}</h2>
                 </div>
-                <div style={styles.statBox}>
-                  <p style={styles.statLabel}>Active Hubs</p>
-                  <h2 style={styles.statValue}>{activeGeofences.length}</h2>
+                <div className="stat-box">
+                  <p className="stat-label">Active Hubs</p>
+                  <h2 className="stat-value">{activeGeofences.length}</h2>
                 </div>
               </div>
 
               {lastAudit && (
-                <div style={styles.auditResultCard}>
-                  <h4 style={styles.auditTitle}><Activity size={16} /> Manual Triggered Audit Result</h4>
-                  <p style={styles.auditText}><b>Primary Zone:</b> {lastAudit.geofence_zone}</p>
-                  <div style={styles.noiseComparison}>
+                <div className="audit-result-card">
+                  <h4 className="audit-title"><Activity size={16} /> Manual Triggered Audit Result</h4>
+                  <p className="audit-text"><b>Primary Zone:</b> {lastAudit.geofence_zone}</p>
+                  <div className="noise-comparison">
                     <div>
-                      <span style={styles.badgeLabel}>True Count</span>
-                      <p style={styles.trueCount}>{lastAudit.true_count}</p>
+                      <span className="badge-label">True Count</span>
+                      <p className="true-count">{lastAudit.true_count}</p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={styles.badgeLabel}>Perturbed Audit Output</span>
-                      <p style={styles.noisyCount}>{lastAudit.reported_count}</p>
+                      <span className="badge-label">Perturbed Audit Output</span>
+                      <p className="noisy-count">{lastAudit.reported_count}</p>
                     </div>
                   </div>
-                  <p style={styles.noiseDetail}>
+                  <p className="noise-detail">
                     Added Laplace Noise: <b>{Number(lastAudit.laplacian_noise || 0).toFixed(3)}</b> (ε = 1.5)
                   </p>
                 </div>
@@ -504,23 +592,37 @@ function MainApp() {
             </div>
 
             {/* MAP CONTAINER */}
-            <div style={styles.mapContainer}>
-              <MapContainer center={[12.9550, 77.6320]} zoom={13} style={{ height: '100%', width: '100%' }}>
+            <div className="map-container">
+              <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; OpenStreetMap contributors'
                 />
+                <MapRecenter center={mapCenter} />
                 <MapClickHandler mapMode={mapMode} onMapClick={handleMapClick} />
 
+                {/* Active Geofence Polygons */}
                 {activeGeofences.map((geo) => {
                   if (!geo || !Array.isArray(geo.bounds) || geo.bounds.length < 3) return null;
                   return (
-                    <Polygon key={geo.geofence_id} positions={geo.bounds} pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}>
+                    <Polygon
+                      key={geo.geofence_id}
+                      positions={geo.bounds}
+                      eventHandlers={{
+                        click: (e) => {
+                          if (mapMode !== 'geofence' && e.latlng) {
+                            handleMapClick([e.latlng.lat, e.latlng.lng]);
+                          }
+                        }
+                      }}
+                      pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}
+                    >
                       <Popup><b>{geo.name}</b></Popup>
                     </Polygon>
                   );
                 })}
 
+                {/* Drawing Geofence Points */}
                 {drawnGeofencePoints.length > 0 && (
                   <>
                     <Polyline positions={drawnGeofencePoints} pathOptions={{ color: '#F59E0B', dashArray: '6, 6' }} />
@@ -530,74 +632,131 @@ function MainApp() {
                   </>
                 )}
 
+                {/* Selected Map Coordinates Preview Marker - Masked with Geohash */}
+                {selectedPin && (
+                  <CircleMarker
+                    center={selectedPin}
+                    radius={8}
+                    pathOptions={{ color: '#F59E0B', fillColor: '#FBBF24', fillOpacity: 0.9, weight: 2 }}
+                  >
+                    <Popup defaultOpen>
+                      <div style={{ textAlign: 'center', fontSize: '11px', color: '#111827', fontFamily: 'Segoe UI, sans-serif' }}>
+                        <b style={{ color: '#D97706' }}>📍 Location Selected</b><br />
+                        <b>Encoded Geohash:</b> <code style={{ color: '#2563EB', fontWeight: 'bold' }}>{encodeGeohash(selectedPin[0], selectedPin[1], 7)}</code><br />
+                        <b>Raw Coordinates:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
+                        <span style={{ color: '#059669', fontWeight: 'bold' }}>Click 'Validate & Ingest Ping' below</span>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                )}
+
+                {/* Standard Telemetry Spatial Logs - Masked with Geohash */}
                 {logs.map((log) => {
                   if (!log || !log.masked_geohash) return null;
                   const coords = decodeGeohash(log.masked_geohash);
                   return (
-                    <CircleMarker key={log.log_id} center={coords} radius={6} pathOptions={{ color: '#60A5FA', fillColor: '#3B82F6', fillOpacity: 0.8 }}>
+                    <CircleMarker key={log.log_id} center={coords} radius={6} pathOptions={{ color: '#38BDF8', fillColor: '#0284C7', fillOpacity: 0.8, weight: 2 }}>
                       <Popup>
-                        <b>Geohash:</b> {log.masked_geohash}<br />
+                        <b>Log ID:</b> #{log.log_id}<br />
+                        <b>Masked Geohash:</b> <code style={{ color: '#2563EB', fontWeight: 'bold' }}>{log.masked_geohash}</code><br />
                         <b>Raw Lat:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
                         <b>Raw Lon:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span>
                       </Popup>
                     </CircleMarker>
                   );
                 })}
+
+                {/* Newly Ingested Driver Highlight Marker - Masked with Geohash */}
+                {latestIngestedPing && (
+                  <>
+                    <CircleMarker
+                      center={[latestIngestedPing.lat, latestIngestedPing.lon]}
+                      radius={16}
+                      pathOptions={{ color: '#2563EB', fillColor: '#60A5FA', fillOpacity: 0.35, weight: 2 }}
+                    />
+                    <CircleMarker
+                      center={[latestIngestedPing.lat, latestIngestedPing.lon]}
+                      radius={9}
+                      pathOptions={{ color: '#1E40AF', fillColor: '#2563EB', fillOpacity: 1.0, weight: 3 }}
+                    >
+                      <Popup defaultOpen>
+                        <div style={{ textAlign: 'center', fontFamily: 'Segoe UI, sans-serif' }}>
+                          <strong style={{ color: '#2563EB', fontSize: '13px' }}>📍 Driver Ping Ingested</strong><br />
+                          <span style={{ fontSize: '11px', color: '#374151' }}>
+                            <b>Driver ID:</b> {latestIngestedPing.driver_id}<br />
+                            <b>Masked Geohash:</b> <code style={{ color: '#2563EB', fontWeight: 'bold' }}>{latestIngestedPing.masked_geohash}</code><br />
+                            <b>Raw Coordinates:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
+                            <span style={{ color: '#059669', fontWeight: 'bold' }}>✓ Validated & Saved in PostGIS</span>
+                          </span>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  </>
+                )}
               </MapContainer>
             </div>
           </div>
 
           {/* LOWER WORKSPACE */}
-          <div style={styles.bottomSection}>
-            <div style={styles.twinGrid}>
-              <div style={styles.methodCard}>
-                <h3 style={styles.methodTitle}><PlusCircle size={18} color="#60A5FA" /> Custom Telemetry Ingestion (Boundary Enforced)</h3>
-                <form onSubmit={handleIngestCustomPing} style={styles.formGrid}>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Driver ID</label>
-                    <input type="text" value={customDriverId} onChange={e => setCustomDriverId(e.target.value)} style={styles.input} required />
+          <div className="bottom-section">
+            <div className="twin-grid">
+              <div className="method-card">
+                <h3 className="method-title"><PlusCircle size={18} color="#60A5FA" /> Custom Telemetry Ingestion (Boundary Enforced)</h3>
+                <form onSubmit={handleIngestCustomPing} className="form-grid">
+                  <div className="input-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="input-label">Driver ID</label>
+                      <button
+                        type="button"
+                        onClick={() => setCustomDriverId(generateDriverId())}
+                        style={{ background: 'none', border: 'none', color: '#60A5FA', fontSize: '10px', cursor: 'pointer', padding: 0 }}
+                      >
+                        ↻ Refresh ID
+                      </button>
+                    </div>
+                    <input type="text" value={customDriverId} onChange={e => setCustomDriverId(e.target.value)} className="input-field" required />
                   </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Latitude</label>
-                    <input type="text" value={customLat} onChange={e => setCustomLat(e.target.value)} style={styles.input} required />
+                  <div className="input-group">
+                    <label className="input-label">Latitude</label>
+                    <input type="text" value={customLat} onChange={e => setCustomLat(e.target.value)} className="input-field" required />
                   </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Longitude</label>
-                    <input type="text" value={customLon} onChange={e => setCustomLon(e.target.value)} style={styles.input} required />
+                  <div className="input-group">
+                    <label className="input-label">Longitude</label>
+                    <input type="text" value={customLon} onChange={e => setCustomLon(e.target.value)} className="input-field" required />
                   </div>
-                  <button type="submit" disabled={loading} style={styles.btnPrimaryForm}>Validate & Ingest Ping</button>
+                  <button type="submit" disabled={loading} className="btn-primary-form">Validate & Ingest Ping</button>
                 </form>
 
                 {validationError && (
-                  <div style={styles.errorBox}>
+                  <div className="error-box">
                     <AlertTriangle size={16} color="#F87171" />
                     <span>{validationError}</span>
                   </div>
                 )}
               </div>
 
-              <div style={styles.methodCard}>
-                <h3 style={styles.methodTitle}><Cpu size={18} color="#10B981" /> PostGIS System Catalog Index Profiler</h3>
-                <div style={styles.metaTableWrapper}>
-                  <table style={styles.miniTable}>
+              <div className="method-card">
+                <h3 className="method-title"><Cpu size={18} color="#10B981" /> PostGIS System Catalog Index Profiler</h3>
+                <div className="meta-table-wrapper">
+                  <table className="mini-table">
                     <thead>
                       <tr>
-                        <th style={styles.thMini}>Index Name</th>
-                        <th style={styles.thMini}>Algorithm</th>
-                        <th style={styles.thMini}>Size</th>
-                        <th style={styles.thMini}>Scans</th>
+                        <th className="th-mini">Index Name</th>
+                        <th className="th-mini">Algorithm</th>
+                        <th className="th-mini">Size</th>
+                        <th className="th-mini">Scans</th>
                       </tr>
                     </thead>
                     <tbody>
                       {indexMetadata.length === 0 ? (
-                        <tr><td colSpan="4" style={styles.emptyTd}>No catalog metadata retrieved.</td></tr>
+                        <tr><td colSpan="4" className="empty-td">No catalog metadata retrieved.</td></tr>
                       ) : (
                         indexMetadata.map((meta, idx) => (
-                          <tr key={idx} style={styles.tr}>
-                            <td style={styles.tdMiniMono}>{meta.index_name}</td>
-                            <td style={styles.tdMiniPill}><span style={styles.pillAlgo}>{String(meta.algorithm || '').toUpperCase()}</span></td>
-                            <td style={styles.tdMini}>{meta.size}</td>
-                            <td style={styles.tdMiniBold}>{meta.total_scans}</td>
+                          <tr key={idx} className="tr">
+                            <td className="td-mini-mono">{meta.index_name}</td>
+                            <td className="td-mini-pill"><span className="pill-algo">{String(meta.algorithm || '').toUpperCase()}</span></td>
+                            <td className="td-mini">{meta.size}</td>
+                            <td className="td-mini-bold">{meta.total_scans}</td>
                           </tr>
                         ))
                       )}
@@ -607,33 +766,33 @@ function MainApp() {
               </div>
             </div>
 
-            <div style={styles.tableCard}>
-              <h3 style={styles.cardTitle}><EyeOff size={18} /> Live Ingested Location Transformation Matrix</h3>
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
+            <div className="table-card">
+              <h3 className="card-title"><EyeOff size={18} /> Live Ingested Location Transformation Matrix</h3>
+              <div className="table-wrapper">
+                <table className="table">
                   <thead>
                     <tr>
-                      <th style={styles.th}>Ping ID</th>
-                      <th style={styles.th}>Original Raw Latitude</th>
-                      <th style={styles.th}>Original Raw Longitude</th>
-                      <th style={styles.th}>Encrypted / Masked Geohash</th>
-                      <th style={styles.th}>Applied Protection Status</th>
+                      <th className="th">Ping ID</th>
+                      <th className="th">Original Raw Latitude</th>
+                      <th className="th">Original Raw Longitude</th>
+                      <th className="th">Encrypted / Masked Geohash</th>
+                      <th className="th">Applied Protection Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {logs.length === 0 ? (
                       <tr>
-                        <td colSpan="5" style={styles.emptyTd}>No driver pings ingested yet. Click 'Simulate 15 Pings Across All Zones' above.</td>
+                        <td colSpan="5" className="empty-td">No driver pings ingested yet. Click 'Simulate 15 Pings Across All Zones' above.</td>
                       </tr>
                     ) : (
                       logs.map((log) => (
-                        <tr key={log.log_id} style={styles.tr}>
-                          <td style={styles.tdMonospace}>#{log.log_id}</td>
-                          <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
-                          <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
-                          <td style={styles.tdEncrypted}><code>{log.masked_geohash}</code></td>
-                          <td style={styles.tdPill}>
-                            <span style={styles.pillActive}>Masked & Differential Privacy Protected</span>
+                        <tr key={log.log_id} className="tr">
+                          <td className="td-monospace">#{log.log_id}</td>
+                          <td className="td-redacted">[REDACTED AT EDGE]</td>
+                          <td className="td-redacted">[REDACTED AT EDGE]</td>
+                          <td className="td-encrypted"><code>{log.masked_geohash}</code></td>
+                          <td className="td-pill">
+                            <span className="pill-active">Masked & Differential Privacy Protected</span>
                           </td>
                         </tr>
                       ))
@@ -648,36 +807,36 @@ function MainApp() {
 
       {/* TAB 2: DEDICATED BENCHMARKING ANALYZER */}
       {activeTab === 'benchmarks' && (
-        <div style={styles.benchmarkSection}>
-          <div style={styles.benchmarkHeaderCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="benchmark-section">
+          <div className="benchmark-header-card">
+            <div className="benchmark-header-flex">
               <div>
-                <h2 style={{ fontSize: '20px', margin: 0, color: '#34D399', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 className="benchmark-main-title">
                   <BarChart3 size={24} /> Empirical Benchmark & Performance Suite
                 </h2>
-                <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                <p className="benchmark-main-sub">
                   Multi-aspect evaluation comparing sub-linear PostGIS GiST indexing against traditional unindexed scans and AES-256 encryption.
                 </p>
               </div>
-              <button onClick={handleRunBenchmark} disabled={loading} style={styles.btnSuccessWide}>
+              <button onClick={handleRunBenchmark} disabled={loading} className="btn-success-wide">
                 <RefreshCw size={16} /> Re-Run Live Benchmark Suite
               </button>
             </div>
           </div>
 
           {benchmarkData && benchmarkData.paradigms && (
-            <div style={styles.benchmarkGridContainer}>
+            <div className="benchmark-grid-container">
 
               {/* GRAPH 1: MULTI-SCALE LATENCY TREND */}
-              <div style={styles.chartCard}>
-                <h3 style={styles.chartCardTitle}><Zap size={18} color="#60A5FA" /> Query Latency Scaling (ms) Across Telemetry Input Volume</h3>
-                <p style={styles.chartDesc}>Measures spatial containment search duration as dataset grows from 100 to 100,000 pings.</p>
+              <div className="chart-card">
+                <h3 className="chart-card-title"><Zap size={18} color="#60A5FA" /> Query Latency Scaling (ms) Across Telemetry Input Volume</h3>
+                <p className="chart-desc">Measures spatial containment search duration as dataset grows from 100 to 100,000 pings.</p>
 
-                <div style={styles.multiScaleGrid}>
+                <div className="multi-scale-grid">
                   {benchmarkData.scales.map((scale, sIdx) => (
-                    <div key={sIdx} style={styles.scaleColumn}>
-                      <span style={styles.scaleHeader}>{scale.toLocaleString()} Inputs</span>
-                      <div style={styles.verticalBarContainer}>
+                    <div key={sIdx} className="scale-column">
+                      <span className="scale-header">{scale.toLocaleString()} Inputs</span>
+                      <div className="vertical-bar-container">
                         {benchmarkData.paradigms.map((p, pIdx) => {
                           const lat = benchmarkData.latencies_ms[p.id][sIdx];
                           const colors = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
@@ -685,12 +844,12 @@ function MainApp() {
                           const barHeight = Math.min(100, Math.max(10, (lat / maxScaleLat) * 100));
 
                           return (
-                            <div key={pIdx} style={styles.barItemVertical}>
-                              <div style={styles.barValueLabel}>{lat} ms</div>
-                              <div style={styles.barTrackVertical}>
-                                <div style={{ ...styles.barFillVertical, height: `${barHeight}%`, backgroundColor: colors[pIdx] }}></div>
+                            <div key={pIdx} className="bar-item-vertical">
+                              <div className="bar-value-label">{lat} ms</div>
+                              <div className="bar-track-vertical">
+                                <div className="bar-fill-vertical" style={{ height: `${barHeight}%`, backgroundColor: colors[pIdx] }}></div>
                               </div>
-                              <span style={styles.barLegendName}>{p.name.split('.')[0]}</span>
+                              <span className="bar-legend-name">{p.name.split('.')[0]}</span>
                             </div>
                           );
                         })}
@@ -701,25 +860,25 @@ function MainApp() {
               </div>
 
               {/* GRAPH 2: SYSTEM THROUGHPUT (QPS) */}
-              <div style={styles.chartCard}>
-                <h3 style={styles.chartCardTitle}><Activity size={18} color="#34D399" /> Concurrent System Throughput (Queries Per Second / QPS)</h3>
-                <p style={styles.chartDesc}>Evaluates concurrent query processing capability before hitting CPU database lock limits.</p>
+              <div className="chart-card">
+                <h3 className="chart-card-title"><Activity size={18} color="#34D399" /> Concurrent System Throughput (Queries Per Second / QPS)</h3>
+                <p className="chart-desc">Evaluates concurrent query processing capability before hitting CPU database lock limits.</p>
 
-                <div style={styles.horizontalChartList}>
+                <div className="horizontal-chart-list">
                   {benchmarkData.paradigms.map((p, pIdx) => {
                     const maxQps = Math.max(...benchmarkData.paradigms.map(x => x.throughput_qps), 1);
                     const widthPct = Math.min(100, Math.max(8, (p.throughput_qps / maxQps) * 100));
                     const colors = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
 
                     return (
-                      <div key={pIdx} style={styles.barRowH}>
-                        <div style={styles.barRowHLabel}>
+                      <div key={pIdx} className="bar-row-h">
+                        <div className="bar-row-h-label">
                           <span style={{ color: '#F3F4F6', fontWeight: '600' }}>{p.name}</span>
                           <span style={{ color: '#9CA3AF', fontSize: '11px' }}>{p.complexity}</span>
                         </div>
-                        <div style={styles.barTrackH}>
-                          <div style={{ ...styles.barFillH, width: `${widthPct}%`, backgroundColor: colors[pIdx] }}>
-                            <span style={styles.barValText}>{p.throughput_qps.toLocaleString()} QPS</span>
+                        <div className="bar-track-h">
+                          <div className="bar-fill-h" style={{ width: `${widthPct}%`, backgroundColor: colors[pIdx] }}>
+                            <span className="bar-val-text">{p.throughput_qps.toLocaleString()} QPS</span>
                           </div>
                         </div>
                       </div>
@@ -729,24 +888,22 @@ function MainApp() {
               </div>
 
               {/* GRAPH 3: INDEX MEMORY FOOTPRINT & CPU UTILIZATION METERS */}
-              <div style={styles.twinChartGrid}>
+              <div className="twin-chart-grid">
 
                 {/* INDEX MEMORY GAUGE */}
-                <div style={styles.chartCard}>
-                  <h3 style={styles.chartCardTitle}><Database size={18} color="#F59E0B" /> Database Index Memory Overhead</h3>
-                  <div style={styles.meterList}>
+                <div className="chart-card">
+                  <h3 className="chart-card-title"><Database size={18} color="#F59E0B" /> Database Index Memory Overhead</h3>
+                  <div className="meter-list">
                     {benchmarkData.paradigms.map((p, pIdx) => (
-                      <div key={pIdx} style={styles.meterRow}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                      <div key={pIdx} className="meter-row">
+                        <div className="meter-header">
                           <span style={{ color: '#D1D5DB' }}>{p.name}</span>
                           <span style={{ color: '#F59E0B', fontWeight: '700', fontFamily: 'monospace' }}>{p.memory_str}</span>
                         </div>
-                        <div style={styles.meterTrack}>
-                          <div style={{
-                            height: '100%',
+                        <div className="meter-track">
+                          <div className="meter-fill" style={{
                             width: `${Math.min(100, Math.max(4, (p.memory_kb / 32768) * 100))}%`,
-                            backgroundColor: pIdx === 2 ? '#EF4444' : '#10B981',
-                            borderRadius: '4px'
+                            backgroundColor: pIdx === 2 ? '#EF4444' : '#10B981'
                           }}></div>
                         </div>
                       </div>
@@ -755,23 +912,21 @@ function MainApp() {
                 </div>
 
                 {/* CPU UTILIZATION METER */}
-                <div style={styles.chartCard}>
-                  <h3 style={styles.chartCardTitle}><Cpu size={18} color="#EC4899" /> Spatial Query CPU Utilization (%)</h3>
-                  <div style={styles.meterList}>
+                <div className="chart-card">
+                  <h3 className="chart-card-title"><Cpu size={18} color="#EC4899" /> Spatial Query CPU Utilization (%)</h3>
+                  <div className="meter-list">
                     {benchmarkData.paradigms.map((p, pIdx) => (
-                      <div key={pIdx} style={styles.meterRow}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                      <div key={pIdx} className="meter-row">
+                        <div className="meter-header">
                           <span style={{ color: '#D1D5DB' }}>{p.name}</span>
                           <span style={{ color: p.cpu_utilization_pct > 50 ? '#EF4444' : '#34D399', fontWeight: '700', fontFamily: 'monospace' }}>
                             {p.cpu_utilization_pct}%
                           </span>
                         </div>
-                        <div style={styles.meterTrack}>
-                          <div style={{
-                            height: '100%',
+                        <div className="meter-track">
+                          <div className="meter-fill" style={{
                             width: `${p.cpu_utilization_pct}%`,
-                            backgroundColor: p.cpu_utilization_pct > 50 ? '#EF4444' : '#34D399',
-                            borderRadius: '4px'
+                            backgroundColor: p.cpu_utilization_pct > 50 ? '#EF4444' : '#34D399'
                           }}></div>
                         </div>
                       </div>
@@ -782,30 +937,30 @@ function MainApp() {
               </div>
 
               {/* DETAILED MATRIX TABLE */}
-              <div style={styles.tableCard}>
-                <h3 style={styles.cardTitle}><Sliders size={18} /> Multi-Dimensional Performance & Privacy Tradeoff Matrix</h3>
-                <div style={styles.tableWrapper}>
-                  <table style={styles.table}>
+              <div className="table-card">
+                <h3 className="card-title"><Sliders size={18} /> Multi-Dimensional Performance & Privacy Tradeoff Matrix</h3>
+                <div className="table-wrapper">
+                  <table className="table">
                     <thead>
                       <tr>
-                        <th style={styles.th}>Approach Paradigm</th>
-                        <th style={styles.th}>Algorithmic Complexity</th>
-                        <th style={styles.th}>Index Primitive</th>
-                        <th style={styles.th}>Throughput (QPS)</th>
-                        <th style={styles.th}>Memory Footprint</th>
-                        <th style={styles.th}>Privacy Protection</th>
-                        <th style={styles.th}>Engine Verdict</th>
+                        <th className="th">Approach Paradigm</th>
+                        <th className="th">Algorithmic Complexity</th>
+                        <th className="th">Index Primitive</th>
+                        <th className="th">Throughput (QPS)</th>
+                        <th className="th">Memory Footprint</th>
+                        <th className="th">Privacy Protection</th>
+                        <th className="th">Engine Verdict</th>
                       </tr>
                     </thead>
                     <tbody>
                       {benchmarkData.paradigms.map((p, idx) => (
-                        <tr key={idx} style={styles.tr}>
-                          <td style={styles.tdMonospaceBold}>{p.name}</td>
-                          <td style={styles.tdMonospace}>{p.complexity}</td>
-                          <td style={styles.tdMiniPill}><span style={styles.pillAlgo}>{p.index_type}</span></td>
-                          <td style={styles.tdLatency}>{p.throughput_qps.toLocaleString()} QPS</td>
-                          <td style={styles.tdMonospace}>{p.memory_str}</td>
-                          <td style={styles.tdPill}>
+                        <tr key={idx} className="tr">
+                          <td className="td-monospace-bold">{p.name}</td>
+                          <td className="td-monospace">{p.complexity}</td>
+                          <td className="td-mini-pill"><span className="pill-algo">{p.index_type}</span></td>
+                          <td className="td-latency">{p.throughput_qps.toLocaleString()} QPS</td>
+                          <td className="td-monospace">{p.memory_str}</td>
+                          <td className="td-pill">
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '12px',
@@ -819,8 +974,8 @@ function MainApp() {
                               {p.privacy_score_pct}% Protected
                             </span>
                           </td>
-                          <td style={styles.tdPill}>
-                            <span style={idx === 0 ? styles.pillActive : styles.pillInactive}>{p.verdict}</span>
+                          <td className="td-pill">
+                            <span className={idx === 0 ? 'pill-active' : 'pill-inactive'}>{p.verdict}</span>
                           </td>
                         </tr>
                       ))}
@@ -830,12 +985,12 @@ function MainApp() {
               </div>
 
               {/* EXPLANATION SUMMARY */}
-              <div style={styles.explanationCard}>
-                <h4 style={styles.explanationTitle}><Info size={16} color="#60A5FA" /> Benchmark Analysis & Architectural Resolution</h4>
-                <p style={styles.explanationText}>
+              <div className="explanation-card">
+                <h4 className="explanation-title"><Info size={16} color="#60A5FA" /> Benchmark Analysis & Architectural Resolution</h4>
+                <p className="explanation-text">
                   <b>1. Unindexed & Encrypted Performance Wall:</b> Traditional PostGIS without indexes incurs linear <b>O(N)</b> sequential scans. Column-level AES-256 encryption destroys spatial locality, forcing complete table decryptions on CPU before evaluating spatial containment. At 100,000 telemetry pings, CPU utilization hits 98.6% and throughput drops to 48 QPS.
                 </p>
-                <p style={styles.explanationText}>
+                <p className="explanation-text">
                   <b>2. CryptoSpatial-DB Sub-linear Efficiency:</b> By indexing 7-character Base32 Geohashes with PostGIS GiST (R-Tree) index structures <b>(O(log N))</b> and applying continuous 2D Laplace Differential Privacy <b>(ε = 1.5)</b>, CryptoSpatial-DB achieves over 8,400 QPS with sub-millisecond latencies and 100% privacy guarantees.
                 </p>
               </div>
@@ -856,122 +1011,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
-// STYLES
-const styles = {
-  container: { backgroundColor: '#0B0F17', color: '#F3F4F6', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif', paddingBottom: '40px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: '#111827', borderBottom: '1px solid #1F2937', gap: '16px', flexWrap: 'nowrap' },
-  brand: { display: 'flex', alignItems: 'center', gap: '12px', minWidth: '280px' },
-  title: { fontSize: '18px', fontWeight: '700', margin: 0, color: '#F9FAFB', whiteSpace: 'nowrap' },
-  subtitle: { fontSize: '11px', color: '#9CA3AF', margin: 0, whiteSpace: 'nowrap' },
-  tabContainer: { display: 'flex', gap: '6px', backgroundColor: '#1F2937', padding: '4px', borderRadius: '8px', border: '1px solid #374151' },
-  tabActive: { backgroundColor: '#2563EB', color: '#FFF', border: 'none', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
-  tabInactive: { backgroundColor: 'transparent', color: '#9CA3AF', border: 'none', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
-
-  headerAuditCard: { backgroundColor: '#1E1B4B', border: '1px solid #4338CA', borderRadius: '8px', padding: '6px 12px', display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '340px' },
-  headerAuditHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  pulseDot: { width: '7px', height: '7px', backgroundColor: '#34D399', borderRadius: '50%', boxShadow: '0 0 6px #34D399' },
-  headerAuditTime: { fontSize: '10px', color: '#A5B4FC', display: 'flex', alignItems: 'center', gap: '4px' },
-  headerAuditMetrics: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#E0E7FF' },
-  headerMetricItem: { whiteSpace: 'nowrap' },
-  headerMetricDivider: { color: '#4338CA', fontSize: '10px' },
-
-  mainGrid: { display: 'grid', gridTemplateColumns: '360px 1fr', height: '560px', borderBottom: '1px solid #1F2937' },
-  sidebar: { backgroundColor: '#111827', padding: '16px', borderRight: '1px solid #1F2937', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' },
-  card: { backgroundColor: '#1F2937', padding: '14px', borderRadius: '10px', border: '1px solid #374151' },
-  cardTitle: { fontSize: '14px', fontWeight: '600', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#60A5FA' },
-  btnPrimary: { width: '100%', padding: '9px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
-  btnDanger: { width: '100%', padding: '9px', backgroundColor: '#DC2626', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
-  btnSuccess: { width: '100%', padding: '9px', backgroundColor: '#059669', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
-  btnSuccessWide: { padding: '10px 16px', backgroundColor: '#059669', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' },
-  btnSecondary: { width: '100%', padding: '8px', backgroundColor: '#374151', color: '#D1D5DB', border: 'none', borderRadius: '6px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
-  btnActiveMode: { width: '100%', padding: '8px', backgroundColor: '#D97706', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
-  btnOutlineDanger: { width: '100%', padding: '8px', backgroundColor: 'transparent', color: '#F87171', border: '1px solid #EF4444', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
-  inputMini: { width: '100%', backgroundColor: '#111827', border: '1px solid #4B5563', color: '#FFF', padding: '6px 8px', borderRadius: '4px', fontSize: '12px', boxSizing: 'border-box' },
-  geofenceList: { display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '120px', overflowY: 'auto' },
-  geofenceItem: { backgroundColor: '#111827', padding: '6px 8px', borderRadius: '6px', border: '1px solid #374151' },
-  viewRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  geofenceBadge: { fontSize: '11px', color: '#F3F4F6', borderLeft: '3px solid', paddingLeft: '6px', fontWeight: '600' },
-  actionBtns: { display: 'flex', gap: '4px' },
-  btnIcon: { backgroundColor: '#374151', color: '#60A5FA', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer' },
-  btnIconDanger: { backgroundColor: '#374151', color: '#F87171', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer' },
-  editRow: { display: 'flex', gap: '4px', alignItems: 'center' },
-  inputEdit: { backgroundColor: '#1F2937', border: '1px solid #60A5FA', color: '#FFF', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', flex: 1 },
-  btnIconSave: { backgroundColor: '#059669', color: '#FFF', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer' },
-  btnIconCancel: { backgroundColor: '#DC2626', color: '#FFF', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
-  statBox: { backgroundColor: '#1F2937', padding: '10px', borderRadius: '8px', border: '1px solid #374151' },
-  statLabel: { fontSize: '11px', color: '#9CA3AF', margin: 0 },
-  statValue: { fontSize: '20px', fontWeight: '700', margin: '2px 0 0 0', color: '#F3F4F6' },
-  auditResultCard: { backgroundColor: '#1E1B4B', padding: '12px', borderRadius: '10px', border: '1px solid #4338CA' },
-  auditTitle: { fontSize: '12px', color: '#A5B4FC', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' },
-  auditText: { fontSize: '11px', margin: '0 0 8px 0', color: '#E0E7FF' },
-  noiseComparison: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' },
-  badgeLabel: { fontSize: '10px', color: '#818CF8', textTransform: 'uppercase' },
-  trueCount: { fontSize: '16px', fontWeight: '700', color: '#F3F4F6', margin: 0 },
-  noisyCount: { fontSize: '16px', fontWeight: '700', color: '#34D399', margin: 0 },
-  noiseDetail: { fontSize: '10px', color: '#C7D2FE', margin: 0, borderTop: '1px solid #3730A3', paddingTop: '4px' },
-  mapContainer: { height: '100%', width: '100%' },
-  bottomSection: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' },
-  twinGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' },
-  methodCard: { backgroundColor: '#111827', padding: '18px', borderRadius: '10px', border: '1px solid #1F2937' },
-  methodTitle: { fontSize: '15px', fontWeight: '600', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#F3F4F6' },
-  formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.2fr', gap: '10px', alignItems: 'end' },
-  inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  label: { fontSize: '11px', color: '#9CA3AF' },
-  input: { backgroundColor: '#1F2937', border: '1px solid #374151', color: '#FFF', padding: '7px 10px', borderRadius: '6px', fontSize: '12px' },
-  btnPrimaryForm: { padding: '8px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
-  errorBox: { marginTop: '12px', padding: '10px', backgroundColor: '#7F1D1D', border: '1px solid #EF4444', color: '#FCA5A5', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' },
-  metaTableWrapper: { overflowX: 'auto' },
-  miniTable: { width: '100%', borderCollapse: 'collapse', fontSize: '11px' },
-  thMini: { padding: '6px 8px', backgroundColor: '#1F2937', color: '#9CA3AF', textAlign: 'left' },
-  tdMiniMono: { padding: '6px 8px', fontFamily: 'monospace', color: '#60A5FA' },
-  tdMiniPill: { padding: '6px 8px' },
-  pillAlgo: { backgroundColor: '#065F46', color: '#34D399', fontSize: '10px', padding: '3px 8px', borderRadius: '10px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block' },
-  tdMini: { padding: '6px 8px', color: '#D1D5DB' },
-  tdMiniBold: { padding: '6px 8px', fontWeight: '700', color: '#F3F4F6' },
-
-  benchmarkSection: { padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' },
-  benchmarkHeaderCard: { backgroundColor: '#111827', padding: '20px', borderRadius: '10px', border: '1px solid #1F2937' },
-  benchmarkGridContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  chartCard: { backgroundColor: '#111827', padding: '20px', borderRadius: '10px', border: '1px solid #1F2937' },
-  chartCardTitle: { fontSize: '15px', fontWeight: '700', color: '#F3F4F6', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' },
-  chartDesc: { fontSize: '12px', color: '#9CA3AF', margin: '0 0 18px 0' },
-  multiScaleGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' },
-  scaleColumn: { backgroundColor: '#1F2937', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' },
-  scaleHeader: { fontSize: '12px', fontWeight: '700', color: '#60A5FA', textAlign: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px' },
-  verticalBarContainer: { display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '180px', paddingTop: '20px' },
-  barItemVertical: { display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', width: '22%' },
-  barValueLabel: { fontSize: '9px', color: '#FFF', fontWeight: '700', marginBottom: '4px', textAlign: 'center' },
-  barTrackVertical: { width: '100%', height: '120px', backgroundColor: '#111827', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' },
-  barFillVertical: { width: '100%', transition: 'height 0.4s ease' },
-  barLegendName: { fontSize: '9px', color: '#9CA3AF', marginTop: '6px', textTransform: 'uppercase' },
-  horizontalChartList: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  barRowH: { display: 'grid', gridTemplateColumns: '240px 1fr', alignItems: 'center', gap: '14px' },
-  barRowHLabel: { display: 'flex', flexDirection: 'column', fontSize: '12px' },
-  barTrackH: { backgroundColor: '#1F2937', borderRadius: '6px', height: '26px', overflow: 'hidden', width: '100%' },
-  barFillH: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '10px', transition: 'width 0.4s ease' },
-  barValText: { fontSize: '11px', color: '#FFF', fontWeight: '700', fontFamily: 'monospace' },
-  twinChartGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' },
-  meterList: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  meterRow: { display: 'flex', flexDirection: 'column' },
-  meterTrack: { height: '10px', backgroundColor: '#1F2937', borderRadius: '4px', overflow: 'hidden', width: '100%' },
-
-  tableCard: { backgroundColor: '#111827', padding: '18px', borderRadius: '10px', border: '1px solid #1F2937' },
-  tableWrapper: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' },
-  th: { padding: '12px 16px', backgroundColor: '#1F2937', color: '#9CA3AF', borderBottom: '1px solid #374151', fontWeight: '600', whiteSpace: 'nowrap' },
-  tr: { borderBottom: '1px solid #1F2937' },
-  tdMonospace: { padding: '12px 16px', fontFamily: 'monospace', color: '#9CA3AF', whiteSpace: 'nowrap' },
-  tdMonospaceBold: { padding: '12px 16px', fontFamily: 'monospace', fontWeight: '700', color: '#F3F4F6', whiteSpace: 'nowrap' },
-  tdLatency: { padding: '12px 16px', fontFamily: 'monospace', color: '#34D399', fontWeight: '700', whiteSpace: 'nowrap' },
-  tdRedacted: { padding: '12px 16px', fontFamily: 'monospace', color: '#EF4444', fontWeight: '600', whiteSpace: 'nowrap' },
-  tdEncrypted: { padding: '12px 16px', fontFamily: 'monospace', color: '#60A5FA', fontWeight: '600', whiteSpace: 'nowrap' },
-  tdPill: { padding: '12px 16px', whiteSpace: 'nowrap' },
-  pillActive: { backgroundColor: '#064E3B', color: '#34D399', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block' },
-  pillInactive: { backgroundColor: '#7F1D1D', color: '#FCA5A5', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block' },
-  emptyTd: { padding: '16px', textAlign: 'center', color: '#6B7280' },
-  explanationCard: { backgroundColor: '#111827', padding: '16px', borderRadius: '8px', border: '1px solid #1F2937' },
-  explanationTitle: { fontSize: '13px', fontWeight: '600', color: '#F3F4F6', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px' },
-  explanationText: { fontSize: '11px', color: '#9CA3AF', margin: '0 0 6px 0', lineHeight: '1.5' }
-};
