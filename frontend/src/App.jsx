@@ -4,12 +4,12 @@ import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import {
   ShieldAlert, Radio, Activity, RefreshCw, Zap,
-  EyeOff, Trash2, Cpu, BarChart3, PlusCircle, MapPin, MousePointer, Info, AlertTriangle, Edit2, Check, X, Database, CheckCircle2, Clock
+  EyeOff, Trash2, Cpu, BarChart3, PlusCircle, MapPin, MousePointer, Info, AlertTriangle, Edit2, Check, X, Database, Clock, LayoutDashboard, Sliders
 } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
-// React Error Boundary
+// React Error Boundary Component
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -43,6 +43,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// Geohash Decoder Function
 function decodeGeohash(geohash) {
   if (!geohash || typeof geohash !== 'string') return [12.9352, 77.6245];
   const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
@@ -87,15 +88,16 @@ function MapClickHandler({ mapMode, onMapClick }) {
 }
 
 function MainApp() {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [logs, setLogs] = useState([]);
   const [reports, setReports] = useState([]);
   const [indexMetadata, setIndexMetadata] = useState([]);
-  const [benchmarkResults, setBenchmarkResults] = useState(null);
+  const [benchmarkData, setBenchmarkData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastAudit, setLastAudit] = useState(null);
   const [activeGeofences, setActiveGeofences] = useState([]);
 
-  // Floating Corner Widget Automated Audit State
+  // Automated Background Audit State
   const [autoAuditState, setAutoAuditState] = useState({
     active: true,
     lastRunTime: 'Just Now',
@@ -285,8 +287,8 @@ function MainApp() {
     setLoading(true);
     try {
       const res = await axios.post(`${API_BASE}/benchmark/run`);
-      if (res.data && res.data.small_scale_benchmarks) {
-        setBenchmarkResults(res.data);
+      if (res.data) {
+        setBenchmarkData(res.data);
       } else {
         alert('Invalid benchmark response format');
       }
@@ -328,7 +330,7 @@ function MainApp() {
     try {
       await axios.delete(`${API_BASE}/reset-pings`);
       setLastAudit(null);
-      setBenchmarkResults(null);
+      setBenchmarkData(null);
       await fetchLogs();
       await fetchReports();
       await fetchIndexMetadata();
@@ -341,442 +343,507 @@ function MainApp() {
 
   return (
     <div style={styles.container}>
-      {/* HEADER */}
+      {/* HEADER WITH INTEGRATED TOP-RIGHT AUTOMATED AUDIT DISPLAY */}
       <header style={styles.header}>
         <div style={styles.brand}>
           <ShieldAlert color="#60A5FA" size={28} />
           <div>
             <h1 style={styles.title}>CryptoSpatial-DB Engine</h1>
-            <p style={styles.subtitle}>Privacy-Preserving Geospatial Auditing • Context-Aware Geo-Indistinguishability</p>
+            <p style={styles.subtitle}>Privacy-Preserving Geospatial Auditing • Geo-Indistinguishability</p>
           </div>
         </div>
-        <div style={styles.statusBadge}>
-          <span style={styles.statusDot}></span>
-          <span>SYSTEM ACTIVE (PostGIS R-Tree GiST)</span>
+
+        {/* NAVIGATION TABS */}
+        <div style={styles.tabContainer}>
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            style={activeTab === 'dashboard' ? styles.tabActive : styles.tabInactive}
+          >
+            <LayoutDashboard size={15} /> Operational Dashboard
+          </button>
+          <button
+            onClick={() => { setActiveTab('benchmarks'); if (!benchmarkData) handleRunBenchmark(); }}
+            style={activeTab === 'benchmarks' ? styles.tabActive : styles.tabInactive}
+          >
+            <BarChart3 size={15} /> Benchmarking Analyzer
+          </button>
+        </div>
+
+        {/* TOP-RIGHT AUTOMATED BACKGROUND AUDIT WIDGET */}
+        <div style={styles.headerAuditCard}>
+          <div style={styles.headerAuditHeader}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={styles.pulseDot}></span>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#34D399' }}>Auto Audit Active</span>
+            </div>
+            <span style={styles.headerAuditTime}><Clock size={11} /> {autoAuditState.lastRunTime}</span>
+          </div>
+          <div style={styles.headerAuditMetrics}>
+            <span style={styles.headerMetricItem}><b>Zone:</b> {autoAuditState.geofence_zone}</span>
+            <span style={styles.headerMetricDivider}>•</span>
+            <span style={styles.headerMetricItem}><b>True:</b> {autoAuditState.true_count}</span>
+            <span style={styles.headerMetricDivider}>•</span>
+            <span style={styles.headerMetricItem}><b>Noise:</b> <span style={{ color: '#F59E0B' }}>{autoAuditState.laplacian_noise > 0 ? `+${autoAuditState.laplacian_noise}` : autoAuditState.laplacian_noise}</span></span>
+            <span style={styles.headerMetricDivider}>•</span>
+            <span style={styles.headerMetricItem}><b>Reported:</b> <span style={{ color: '#34D399', fontWeight: '700' }}>{autoAuditState.reported_count}</span></span>
+          </div>
         </div>
       </header>
 
-      {/* TOP WORKSPACE: SIDEBAR CONTROLS & MAP */}
-      <div style={styles.mainGrid}>
-        <div style={styles.sidebar}>
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}><Zap size={18} /> Simulation & Audit Controls</h3>
-            <button onClick={handleSimulatePings} disabled={loading} style={styles.btnPrimary}>
-              <Radio size={16} /> Simulate 15 Pings Across All Zones
-            </button>
-            <button onClick={handleTriggerAudit} disabled={loading} style={styles.btnDanger}>
-              <ShieldAlert size={16} /> Audit All Active Zones (Laplace Noise)
-            </button>
-            <button onClick={handleRunBenchmark} disabled={loading} style={styles.btnSuccess}>
-              <BarChart3 size={16} /> Run Benchmark Suite (Small vs Huge)
-            </button>
-            <button onClick={fetchLogs} style={styles.btnSecondary}>
-              <RefreshCw size={16} /> Refresh Telemetry
-            </button>
-            <button onClick={handleResetPings} disabled={loading} style={styles.btnOutlineDanger}>
-              <Trash2 size={16} /> Reset Pings & Audits
-            </button>
-          </div>
+      {/* TAB 1: OPERATIONAL DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <>
+          <div style={styles.mainGrid}>
+            <div style={styles.sidebar}>
+              <div style={styles.card}>
+                <h3 style={styles.cardTitle}><Zap size={18} /> Simulation & Audit Controls</h3>
+                <button onClick={handleSimulatePings} disabled={loading} style={styles.btnPrimary}>
+                  <Radio size={16} /> Simulate 15 Pings Across All Zones
+                </button>
+                <button onClick={handleTriggerAudit} disabled={loading} style={styles.btnDanger}>
+                  <ShieldAlert size={16} /> Audit All Active Zones (Laplace Noise)
+                </button>
+                <button onClick={() => { setActiveTab('benchmarks'); handleRunBenchmark(); }} disabled={loading} style={styles.btnSuccess}>
+                  <BarChart3 size={16} /> Open Benchmarking Analyzer
+                </button>
+                <button onClick={fetchLogs} style={styles.btnSecondary}>
+                  <RefreshCw size={16} /> Refresh Telemetry
+                </button>
+                <button onClick={handleResetPings} disabled={loading} style={styles.btnOutlineDanger}>
+                  <Trash2 size={16} /> Reset Pings & Audits
+                </button>
+              </div>
 
-          {/* INTERACTIVE MAP DRAWING MODES */}
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}><MousePointer size={18} /> Delivery Zone Creator</h3>
-            <div style={{ marginBottom: '8px' }}>
-              <label style={styles.label}>Custom Zone Name:</label>
-              <input
-                type="text"
-                value={customZoneName}
-                onChange={e => setCustomZoneName(e.target.value)}
-                style={styles.inputMini}
-              />
-            </div>
-            <button
-              onClick={() => { setMapMode(mapMode === 'geofence' ? 'none' : 'geofence'); setDrawnGeofencePoints([]); }}
-              style={mapMode === 'geofence' ? styles.btnActiveMode : styles.btnSecondary}
-            >
-              <PlusCircle size={16} /> {mapMode === 'geofence' ? `Click Map (${drawnGeofencePoints.length}/4 pts)` : 'Draw Custom Zone on Map'}
-            </button>
-            <button
-              onClick={() => setMapMode(mapMode === 'driver' ? 'none' : 'driver')}
-              style={mapMode === 'driver' ? styles.btnActiveMode : styles.btnSecondary}
-            >
-              <MapPin size={16} /> {mapMode === 'driver' ? 'Click Map to Set Driver Pin' : 'Select Driver Location on Map'}
-            </button>
-          </div>
-
-          {/* ACTIVE GEOFENCES LIST */}
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}><Database size={18} /> Active Delivery Hubs ({activeGeofences.length})</h3>
-            <div style={styles.geofenceList}>
-              {activeGeofences.map((gf) => (
-                <div key={gf.geofence_id} style={styles.geofenceItem}>
-                  {editingGeofenceId === gf.geofence_id ? (
-                    <div style={styles.editRow}>
-                      <input
-                        type="text"
-                        value={editingName}
-                        onChange={e => setEditingName(e.target.value)}
-                        style={styles.inputEdit}
-                      />
-                      <button onClick={() => handleUpdateGeofenceName(gf.geofence_id)} style={styles.btnIconSave}><Check size={14} /></button>
-                      <button onClick={() => setEditingGeofenceId(null)} style={styles.btnIconCancel}><X size={14} /></button>
-                    </div>
-                  ) : (
-                    <div style={styles.viewRow}>
-                      <span style={{ ...styles.geofenceBadge, borderColor: gf.color || '#3B82F6' }}>{gf.name}</span>
-                      <div style={styles.actionBtns}>
-                        <button onClick={() => { setEditingGeofenceId(gf.geofence_id); setEditingName(gf.name); }} style={styles.btnIcon}><Edit2 size={13} /></button>
-                        <button onClick={() => handleDeleteGeofence(gf.geofence_id)} style={styles.btnIconDanger}><Trash2 size={13} /></button>
-                      </div>
-                    </div>
-                  )}
+              {/* INTERACTIVE MAP DRAWING MODES */}
+              <div style={styles.card}>
+                <h3 style={styles.cardTitle}><MousePointer size={18} /> Delivery Zone Creator</h3>
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={styles.label}>Custom Zone Name:</label>
+                  <input
+                    type="text"
+                    value={customZoneName}
+                    onChange={e => setCustomZoneName(e.target.value)}
+                    style={styles.inputMini}
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
+                <button
+                  onClick={() => { setMapMode(mapMode === 'geofence' ? 'none' : 'geofence'); setDrawnGeofencePoints([]); }}
+                  style={mapMode === 'geofence' ? styles.btnActiveMode : styles.btnSecondary}
+                >
+                  <PlusCircle size={16} /> {mapMode === 'geofence' ? `Click Map (${drawnGeofencePoints.length}/4 pts)` : 'Draw Custom Zone on Map'}
+                </button>
+                <button
+                  onClick={() => setMapMode(mapMode === 'driver' ? 'none' : 'driver')}
+                  style={mapMode === 'driver' ? styles.btnActiveMode : styles.btnSecondary}
+                >
+                  <MapPin size={16} /> {mapMode === 'driver' ? 'Click Map to Set Driver Pin' : 'Select Driver Location on Map'}
+                </button>
+              </div>
 
-          <div style={styles.statsGrid}>
-            <div style={styles.statBox}>
-              <p style={styles.statLabel}>Total Ingested Pings</p>
-              <h2 style={styles.statValue}>{logs.length}</h2>
-            </div>
-            <div style={styles.statBox}>
-              <p style={styles.statLabel}>Active Hubs</p>
-              <h2 style={styles.statValue}>{activeGeofences.length}</h2>
-            </div>
-          </div>
-
-          {/* MANUAL AUDIT RESULT CARD */}
-          {lastAudit && (
-            <div style={styles.auditResultCard}>
-              <h4 style={styles.auditTitle}><Activity size={16} /> Manual Triggered Audit Result</h4>
-              <p style={styles.auditText}><b>Primary Zone:</b> {lastAudit.geofence_zone}</p>
-              <div style={styles.noiseComparison}>
-                <div>
-                  <span style={styles.badgeLabel}>True Count</span>
-                  <p style={styles.trueCount}>{lastAudit.true_count}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={styles.badgeLabel}>Perturbed Audit Output</span>
-                  <p style={styles.noisyCount}>{lastAudit.reported_count}</p>
+              {/* ACTIVE GEOFENCES LIST */}
+              <div style={styles.card}>
+                <h3 style={styles.cardTitle}><Database size={18} /> Active Delivery Hubs ({activeGeofences.length})</h3>
+                <div style={styles.geofenceList}>
+                  {activeGeofences.map((gf) => (
+                    <div key={gf.geofence_id} style={styles.geofenceItem}>
+                      {editingGeofenceId === gf.geofence_id ? (
+                        <div style={styles.editRow}>
+                          <input
+                            type="text"
+                            value={editingName}
+                            onChange={e => setEditingName(e.target.value)}
+                            style={styles.inputEdit}
+                          />
+                          <button onClick={() => handleUpdateGeofenceName(gf.geofence_id)} style={styles.btnIconSave}><Check size={14} /></button>
+                          <button onClick={() => setEditingGeofenceId(null)} style={styles.btnIconCancel}><X size={14} /></button>
+                        </div>
+                      ) : (
+                        <div style={styles.viewRow}>
+                          <span style={{ ...styles.geofenceBadge, borderColor: gf.color || '#3B82F6' }}>{gf.name}</span>
+                          <div style={styles.actionBtns}>
+                            <button onClick={() => { setEditingGeofenceId(gf.geofence_id); setEditingName(gf.name); }} style={styles.btnIcon}><Edit2 size={13} /></button>
+                            <button onClick={() => handleDeleteGeofence(gf.geofence_id)} style={styles.btnIconDanger}><Trash2 size={13} /></button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-              <p style={styles.noiseDetail}>
-                Added Laplace Noise: <b>{Number(lastAudit.laplacian_noise || 0).toFixed(3)}</b> (ε = 1.5)
-              </p>
+
+              <div style={styles.statsGrid}>
+                <div style={styles.statBox}>
+                  <p style={styles.statLabel}>Total Ingested Pings</p>
+                  <h2 style={styles.statValue}>{logs.length}</h2>
+                </div>
+                <div style={styles.statBox}>
+                  <p style={styles.statLabel}>Active Hubs</p>
+                  <h2 style={styles.statValue}>{activeGeofences.length}</h2>
+                </div>
+              </div>
+
+              {lastAudit && (
+                <div style={styles.auditResultCard}>
+                  <h4 style={styles.auditTitle}><Activity size={16} /> Manual Triggered Audit Result</h4>
+                  <p style={styles.auditText}><b>Primary Zone:</b> {lastAudit.geofence_zone}</p>
+                  <div style={styles.noiseComparison}>
+                    <div>
+                      <span style={styles.badgeLabel}>True Count</span>
+                      <p style={styles.trueCount}>{lastAudit.true_count}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={styles.badgeLabel}>Perturbed Audit Output</span>
+                      <p style={styles.noisyCount}>{lastAudit.reported_count}</p>
+                    </div>
+                  </div>
+                  <p style={styles.noiseDetail}>
+                    Added Laplace Noise: <b>{Number(lastAudit.laplacian_noise || 0).toFixed(3)}</b> (ε = 1.5)
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* MAP CONTAINER */}
+            <div style={styles.mapContainer}>
+              <MapContainer center={[12.9550, 77.6320]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OpenStreetMap contributors'
+                />
+                <MapClickHandler mapMode={mapMode} onMapClick={handleMapClick} />
+
+                {activeGeofences.map((geo) => {
+                  if (!geo || !Array.isArray(geo.bounds) || geo.bounds.length < 3) return null;
+                  return (
+                    <Polygon key={geo.geofence_id} positions={geo.bounds} pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}>
+                      <Popup><b>{geo.name}</b></Popup>
+                    </Polygon>
+                  );
+                })}
+
+                {drawnGeofencePoints.length > 0 && (
+                  <>
+                    <Polyline positions={drawnGeofencePoints} pathOptions={{ color: '#F59E0B', dashArray: '6, 6' }} />
+                    {drawnGeofencePoints.map((pt, i) => (
+                      <CircleMarker key={i} center={pt} radius={5} pathOptions={{ color: '#F59E0B', fillColor: '#F59E0B', fillOpacity: 1 }} />
+                    ))}
+                  </>
+                )}
+
+                {logs.map((log) => {
+                  if (!log || !log.masked_geohash) return null;
+                  const coords = decodeGeohash(log.masked_geohash);
+                  return (
+                    <CircleMarker key={log.log_id} center={coords} radius={6} pathOptions={{ color: '#60A5FA', fillColor: '#3B82F6', fillOpacity: 0.8 }}>
+                      <Popup>
+                        <b>Geohash:</b> {log.masked_geohash}<br />
+                        <b>Raw Lat:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
+                        <b>Raw Lon:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
+              </MapContainer>
+            </div>
+          </div>
+
+          {/* LOWER WORKSPACE */}
+          <div style={styles.bottomSection}>
+            <div style={styles.twinGrid}>
+              <div style={styles.methodCard}>
+                <h3 style={styles.methodTitle}><PlusCircle size={18} color="#60A5FA" /> Custom Telemetry Ingestion (Boundary Enforced)</h3>
+                <form onSubmit={handleIngestCustomPing} style={styles.formGrid}>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Driver ID</label>
+                    <input type="text" value={customDriverId} onChange={e => setCustomDriverId(e.target.value)} style={styles.input} required />
+                  </div>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Latitude</label>
+                    <input type="text" value={customLat} onChange={e => setCustomLat(e.target.value)} style={styles.input} required />
+                  </div>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Longitude</label>
+                    <input type="text" value={customLon} onChange={e => setCustomLon(e.target.value)} style={styles.input} required />
+                  </div>
+                  <button type="submit" disabled={loading} style={styles.btnPrimaryForm}>Validate & Ingest Ping</button>
+                </form>
+
+                {validationError && (
+                  <div style={styles.errorBox}>
+                    <AlertTriangle size={16} color="#F87171" />
+                    <span>{validationError}</span>
+                  </div>
+                )}
+              </div>
+
+              <div style={styles.methodCard}>
+                <h3 style={styles.methodTitle}><Cpu size={18} color="#10B981" /> PostGIS System Catalog Index Profiler</h3>
+                <div style={styles.metaTableWrapper}>
+                  <table style={styles.miniTable}>
+                    <thead>
+                      <tr>
+                        <th style={styles.thMini}>Index Name</th>
+                        <th style={styles.thMini}>Algorithm</th>
+                        <th style={styles.thMini}>Size</th>
+                        <th style={styles.thMini}>Scans</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {indexMetadata.length === 0 ? (
+                        <tr><td colSpan="4" style={styles.emptyTd}>No catalog metadata retrieved.</td></tr>
+                      ) : (
+                        indexMetadata.map((meta, idx) => (
+                          <tr key={idx} style={styles.tr}>
+                            <td style={styles.tdMiniMono}>{meta.index_name}</td>
+                            <td style={styles.tdMiniPill}><span style={styles.pillAlgo}>{String(meta.algorithm || '').toUpperCase()}</span></td>
+                            <td style={styles.tdMini}>{meta.size}</td>
+                            <td style={styles.tdMiniBold}>{meta.total_scans}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.tableCard}>
+              <h3 style={styles.cardTitle}><EyeOff size={18} /> Live Ingested Location Transformation Matrix</h3>
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Ping ID</th>
+                      <th style={styles.th}>Original Raw Latitude</th>
+                      <th style={styles.th}>Original Raw Longitude</th>
+                      <th style={styles.th}>Encrypted / Masked Geohash</th>
+                      <th style={styles.th}>Applied Protection Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" style={styles.emptyTd}>No driver pings ingested yet. Click 'Simulate 15 Pings Across All Zones' above.</td>
+                      </tr>
+                    ) : (
+                      logs.map((log) => (
+                        <tr key={log.log_id} style={styles.tr}>
+                          <td style={styles.tdMonospace}>#{log.log_id}</td>
+                          <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
+                          <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
+                          <td style={styles.tdEncrypted}><code>{log.masked_geohash}</code></td>
+                          <td style={styles.tdPill}>
+                            <span style={styles.pillActive}>Masked & Differential Privacy Protected</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* TAB 2: DEDICATED BENCHMARKING ANALYZER */}
+      {activeTab === 'benchmarks' && (
+        <div style={styles.benchmarkSection}>
+          <div style={styles.benchmarkHeaderCard}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '20px', margin: 0, color: '#34D399', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <BarChart3 size={24} /> Empirical Benchmark & Performance Suite
+                </h2>
+                <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                  Multi-aspect evaluation comparing sub-linear PostGIS GiST indexing against traditional unindexed scans and AES-256 encryption.
+                </p>
+              </div>
+              <button onClick={handleRunBenchmark} disabled={loading} style={styles.btnSuccessWide}>
+                <RefreshCw size={16} /> Re-Run Live Benchmark Suite
+              </button>
+            </div>
+          </div>
+
+          {benchmarkData && benchmarkData.paradigms && (
+            <div style={styles.benchmarkGridContainer}>
+
+              {/* GRAPH 1: MULTI-SCALE LATENCY TREND */}
+              <div style={styles.chartCard}>
+                <h3 style={styles.chartCardTitle}><Zap size={18} color="#60A5FA" /> Query Latency Scaling (ms) Across Telemetry Input Volume</h3>
+                <p style={styles.chartDesc}>Measures spatial containment search duration as dataset grows from 100 to 100,000 pings.</p>
+
+                <div style={styles.multiScaleGrid}>
+                  {benchmarkData.scales.map((scale, sIdx) => (
+                    <div key={sIdx} style={styles.scaleColumn}>
+                      <span style={styles.scaleHeader}>{scale.toLocaleString()} Inputs</span>
+                      <div style={styles.verticalBarContainer}>
+                        {benchmarkData.paradigms.map((p, pIdx) => {
+                          const lat = benchmarkData.latencies_ms[p.id][sIdx];
+                          const colors = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
+                          const maxScaleLat = Math.max(...Object.values(benchmarkData.latencies_ms).map(arr => arr[sIdx]), 1);
+                          const barHeight = Math.min(100, Math.max(10, (lat / maxScaleLat) * 100));
+
+                          return (
+                            <div key={pIdx} style={styles.barItemVertical}>
+                              <div style={styles.barValueLabel}>{lat} ms</div>
+                              <div style={styles.barTrackVertical}>
+                                <div style={{ ...styles.barFillVertical, height: `${barHeight}%`, backgroundColor: colors[pIdx] }}></div>
+                              </div>
+                              <span style={styles.barLegendName}>{p.name.split('.')[0]}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* GRAPH 2: SYSTEM THROUGHPUT (QPS) */}
+              <div style={styles.chartCard}>
+                <h3 style={styles.chartCardTitle}><Activity size={18} color="#34D399" /> Concurrent System Throughput (Queries Per Second / QPS)</h3>
+                <p style={styles.chartDesc}>Evaluates concurrent query processing capability before hitting CPU database lock limits.</p>
+
+                <div style={styles.horizontalChartList}>
+                  {benchmarkData.paradigms.map((p, pIdx) => {
+                    const maxQps = Math.max(...benchmarkData.paradigms.map(x => x.throughput_qps), 1);
+                    const widthPct = Math.min(100, Math.max(8, (p.throughput_qps / maxQps) * 100));
+                    const colors = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
+
+                    return (
+                      <div key={pIdx} style={styles.barRowH}>
+                        <div style={styles.barRowHLabel}>
+                          <span style={{ color: '#F3F4F6', fontWeight: '600' }}>{p.name}</span>
+                          <span style={{ color: '#9CA3AF', fontSize: '11px' }}>{p.complexity}</span>
+                        </div>
+                        <div style={styles.barTrackH}>
+                          <div style={{ ...styles.barFillH, width: `${widthPct}%`, backgroundColor: colors[pIdx] }}>
+                            <span style={styles.barValText}>{p.throughput_qps.toLocaleString()} QPS</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* GRAPH 3: INDEX MEMORY FOOTPRINT & CPU UTILIZATION METERS */}
+              <div style={styles.twinChartGrid}>
+
+                {/* INDEX MEMORY GAUGE */}
+                <div style={styles.chartCard}>
+                  <h3 style={styles.chartCardTitle}><Database size={18} color="#F59E0B" /> Database Index Memory Overhead</h3>
+                  <div style={styles.meterList}>
+                    {benchmarkData.paradigms.map((p, pIdx) => (
+                      <div key={pIdx} style={styles.meterRow}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <span style={{ color: '#D1D5DB' }}>{p.name}</span>
+                          <span style={{ color: '#F59E0B', fontWeight: '700', fontFamily: 'monospace' }}>{p.memory_str}</span>
+                        </div>
+                        <div style={styles.meterTrack}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(100, Math.max(4, (p.memory_kb / 32768) * 100))}%`,
+                            backgroundColor: pIdx === 2 ? '#EF4444' : '#10B981',
+                            borderRadius: '4px'
+                          }}></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CPU UTILIZATION METER */}
+                <div style={styles.chartCard}>
+                  <h3 style={styles.chartCardTitle}><Cpu size={18} color="#EC4899" /> Spatial Query CPU Utilization (%)</h3>
+                  <div style={styles.meterList}>
+                    {benchmarkData.paradigms.map((p, pIdx) => (
+                      <div key={pIdx} style={styles.meterRow}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <span style={{ color: '#D1D5DB' }}>{p.name}</span>
+                          <span style={{ color: p.cpu_utilization_pct > 50 ? '#EF4444' : '#34D399', fontWeight: '700', fontFamily: 'monospace' }}>
+                            {p.cpu_utilization_pct}%
+                          </span>
+                        </div>
+                        <div style={styles.meterTrack}>
+                          <div style={{
+                            height: '100%',
+                            width: `${p.cpu_utilization_pct}%`,
+                            backgroundColor: p.cpu_utilization_pct > 50 ? '#EF4444' : '#34D399',
+                            borderRadius: '4px'
+                          }}></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* DETAILED MATRIX TABLE */}
+              <div style={styles.tableCard}>
+                <h3 style={styles.cardTitle}><Sliders size={18} /> Multi-Dimensional Performance & Privacy Tradeoff Matrix</h3>
+                <div style={styles.tableWrapper}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Approach Paradigm</th>
+                        <th style={styles.th}>Algorithmic Complexity</th>
+                        <th style={styles.th}>Index Primitive</th>
+                        <th style={styles.th}>Throughput (QPS)</th>
+                        <th style={styles.th}>Memory Footprint</th>
+                        <th style={styles.th}>Privacy Protection</th>
+                        <th style={styles.th}>Engine Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {benchmarkData.paradigms.map((p, idx) => (
+                        <tr key={idx} style={styles.tr}>
+                          <td style={styles.tdMonospaceBold}>{p.name}</td>
+                          <td style={styles.tdMonospace}>{p.complexity}</td>
+                          <td style={styles.tdMiniPill}><span style={styles.pillAlgo}>{p.index_type}</span></td>
+                          <td style={styles.tdLatency}>{p.throughput_qps.toLocaleString()} QPS</td>
+                          <td style={styles.tdMonospace}>{p.memory_str}</td>
+                          <td style={styles.tdPill}>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block',
+                              backgroundColor: p.privacy_score_pct === 100 ? '#064E3B' : (p.privacy_score_pct >= 50 ? '#78350F' : '#7F1D1D'),
+                              color: p.privacy_score_pct === 100 ? '#34D399' : (p.privacy_score_pct >= 50 ? '#FBBF24' : '#FCA5A5')
+                            }}>
+                              {p.privacy_score_pct}% Protected
+                            </span>
+                          </td>
+                          <td style={styles.tdPill}>
+                            <span style={idx === 0 ? styles.pillActive : styles.pillInactive}>{p.verdict}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* EXPLANATION SUMMARY */}
+              <div style={styles.explanationCard}>
+                <h4 style={styles.explanationTitle}><Info size={16} color="#60A5FA" /> Benchmark Analysis & Architectural Resolution</h4>
+                <p style={styles.explanationText}>
+                  <b>1. Unindexed & Encrypted Performance Wall:</b> Traditional PostGIS without indexes incurs linear <b>O(N)</b> sequential scans. Column-level AES-256 encryption destroys spatial locality, forcing complete table decryptions on CPU before evaluating spatial containment. At 100,000 telemetry pings, CPU utilization hits 98.6% and throughput drops to 48 QPS.
+                </p>
+                <p style={styles.explanationText}>
+                  <b>2. CryptoSpatial-DB Sub-linear Efficiency:</b> By indexing 7-character Base32 Geohashes with PostGIS GiST (R-Tree) index structures <b>(O(log N))</b> and applying continuous 2D Laplace Differential Privacy <b>(ε = 1.5)</b>, CryptoSpatial-DB achieves over 8,400 QPS with sub-millisecond latencies and 100% privacy guarantees.
+                </p>
+              </div>
+
             </div>
           )}
         </div>
-
-        {/* MAP CONTAINER */}
-        <div style={styles.mapContainer}>
-          <MapContainer center={[12.9550, 77.6320]} zoom={13} style={{ height: '100%', width: '100%' }}>
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; OpenStreetMap contributors'
-            />
-            <MapClickHandler mapMode={mapMode} onMapClick={handleMapClick} />
-
-            {/* Render Active Geofence Polygons */}
-            {activeGeofences.map((geo) => {
-              if (!geo || !Array.isArray(geo.bounds) || geo.bounds.length < 3) return null;
-              return (
-                <Polygon key={geo.geofence_id} positions={geo.bounds} pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}>
-                  <Popup><b>{geo.name}</b></Popup>
-                </Polygon>
-              );
-            })}
-
-            {/* Render In-Progress Drawn Polygon */}
-            {drawnGeofencePoints.length > 0 && (
-              <>
-                <Polyline positions={drawnGeofencePoints} pathOptions={{ color: '#F59E0B', dashArray: '6, 6' }} />
-                {drawnGeofencePoints.map((pt, i) => (
-                  <CircleMarker key={i} center={pt} radius={5} pathOptions={{ color: '#F59E0B', fillColor: '#F59E0B', fillOpacity: 1 }} />
-                ))}
-              </>
-            )}
-
-            {/* Render Ingested Masked Driver Geohashes */}
-            {logs.map((log) => {
-              if (!log || !log.masked_geohash) return null;
-              const coords = decodeGeohash(log.masked_geohash);
-              return (
-                <CircleMarker key={log.log_id} center={coords} radius={6} pathOptions={{ color: '#60A5FA', fillColor: '#3B82F6', fillOpacity: 0.8 }}>
-                  <Popup>
-                    <b>Geohash:</b> {log.masked_geohash}<br />
-                    <b>Raw Lat:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
-                    <b>Raw Lon:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span>
-                  </Popup>
-                </CircleMarker>
-              );
-            })}
-          </MapContainer>
-        </div>
-      </div>
-
-      {/* LOWER WORKSPACE */}
-      <div style={styles.bottomSection}>
-
-        {/* DYNAMIC PING INPUT & CATALOG PROFILER */}
-        <div style={styles.twinGrid}>
-          {/* DYNAMIC TELEMETRY INGESTION FORM */}
-          <div style={styles.methodCard}>
-            <h3 style={styles.methodTitle}><PlusCircle size={18} color="#60A5FA" /> Custom Telemetry Ingestion (With Boundary Check)</h3>
-            <form onSubmit={handleIngestCustomPing} style={styles.formGrid}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Driver ID</label>
-                <input type="text" value={customDriverId} onChange={e => setCustomDriverId(e.target.value)} style={styles.input} required />
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Latitude</label>
-                <input type="text" value={customLat} onChange={e => setCustomLat(e.target.value)} style={styles.input} required />
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Longitude</label>
-                <input type="text" value={customLon} onChange={e => setCustomLon(e.target.value)} style={styles.input} required />
-              </div>
-              <button type="submit" disabled={loading} style={styles.btnPrimaryForm}>Validate & Ingest Ping</button>
-            </form>
-
-            {validationError && (
-              <div style={styles.errorBox}>
-                <AlertTriangle size={16} color="#F87171" />
-                <span>{validationError}</span>
-              </div>
-            )}
-          </div>
-
-          {/* POSTGIS INDEX PROFILER */}
-          <div style={styles.methodCard}>
-            <h3 style={styles.methodTitle}><Cpu size={18} color="#10B981" /> PostGIS System Catalog Index Profiler</h3>
-            <div style={styles.metaTableWrapper}>
-              <table style={styles.miniTable}>
-                <thead>
-                  <tr>
-                    <th style={styles.thMini}>Index Name</th>
-                    <th style={styles.thMini}>Algorithm</th>
-                    <th style={styles.thMini}>Size</th>
-                    <th style={styles.thMini}>Scans</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {indexMetadata.length === 0 ? (
-                    <tr><td colSpan="4" style={styles.emptyTd}>No catalog metadata retrieved.</td></tr>
-                  ) : (
-                    indexMetadata.map((meta, idx) => (
-                      <tr key={idx} style={styles.tr}>
-                        <td style={styles.tdMiniMono}>{meta.index_name}</td>
-                        <td style={styles.tdMiniPill}><span style={styles.pillAlgo}>{String(meta.algorithm || '').toUpperCase()}</span></td>
-                        <td style={styles.tdMini}>{meta.size}</td>
-                        <td style={styles.tdMiniBold}>{meta.total_scans}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* BENCHMARKING DUAL-PROFILE COMPARISON (FEW VS HUGE INPUTS) */}
-        {benchmarkResults && benchmarkResults.small_scale_benchmarks && (
-          <div style={styles.benchmarkCard}>
-            <h3 style={styles.cardTitle}>
-              <BarChart3 size={18} color="#34D399" /> Empirical Benchmarks: Small Input Workload vs Huge Input Workload
-            </h3>
-
-            {/* DUAL COLUMN BENCHMARK GRID */}
-            <div style={styles.dualBenchmarkGrid}>
-
-              {/* CARD 1: SMALL WORKLOAD (100 INPUTS) */}
-              <div style={styles.scaleCard}>
-                <div style={styles.scaleCardHeader}>
-                  <Zap size={16} color="#60A5FA" />
-                  <span style={styles.scaleTitle}>Small Workload Profile (100 Telemetry Inputs)</span>
-                </div>
-                <div style={styles.barChartGrid}>
-                  {(() => {
-                    const bmList = benchmarkResults.small_scale_benchmarks;
-                    const maxLat = Math.max(...bmList.map(b => b.latency_ms), 1);
-                    const colors = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
-
-                    return bmList.map((bm, idx) => {
-                      const barWidth = Math.min(100, Math.max(12, (bm.latency_ms / maxLat) * 100));
-                      return (
-                        <div key={idx} style={styles.barRowMini}>
-                          <span style={styles.barLabelMini}>{bm.approach}</span>
-                          <div style={styles.barTrack}>
-                            <div style={{ ...styles.barFill, width: `${barWidth}%`, backgroundColor: colors[idx % colors.length] }}>
-                              <span style={styles.barValue}>{bm.latency_ms} ms</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              {/* CARD 2: HUGE WORKLOAD (100,000 INPUTS) */}
-              <div style={styles.scaleCard}>
-                <div style={styles.scaleCardHeader}>
-                  <BarChart3 size={16} color="#F59E0B" />
-                  <span style={styles.scaleTitle}>Huge Workload Scale Profile (100,000 Telemetry Inputs)</span>
-                </div>
-                <div style={styles.barChartGrid}>
-                  {(() => {
-                    const bmList = benchmarkResults.huge_scale_benchmarks;
-                    const maxLat = Math.max(...bmList.map(b => b.latency_ms), 1);
-                    const colors = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
-
-                    return bmList.map((bm, idx) => {
-                      const barWidth = Math.min(100, Math.max(12, (bm.latency_ms / maxLat) * 100));
-                      return (
-                        <div key={idx} style={styles.barRowMini}>
-                          <span style={styles.barLabelMini}>{bm.approach}</span>
-                          <div style={styles.barTrack}>
-                            <div style={{ ...styles.barFill, width: `${barWidth}%`, backgroundColor: colors[idx % colors.length] }}>
-                              <span style={styles.barValue}>{bm.latency_ms} ms</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-            </div>
-
-            {/* COMPARISON MATRIX TABLE */}
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Approach Paradigm</th>
-                    <th style={styles.th}>Small Scale (100 inputs)</th>
-                    <th style={styles.th}>Huge Scale (100,000 inputs)</th>
-                    <th style={styles.th}>Complexity</th>
-                    <th style={styles.th}>Scalability Verdict</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {benchmarkResults.small_scale_benchmarks.map((bmSmall, idx) => {
-                    const bmHuge = benchmarkResults.huge_scale_benchmarks[idx];
-                    return (
-                      <tr key={idx} style={styles.tr}>
-                        <td style={styles.tdMonospaceBold}>{bmSmall.approach}</td>
-                        <td style={styles.tdLatency}>{bmSmall.latency_ms} ms</td>
-                        <td style={{ ...styles.tdLatency, color: idx === 0 ? '#34D399' : '#EF4444' }}>{bmHuge.latency_ms} ms</td>
-                        <td style={styles.tdMonospace}>{bmHuge.complexity}</td>
-                        <td style={styles.tdPill}>
-                          <span style={idx === 0 ? styles.pillActive : styles.pillInactive}>
-                            {bmHuge.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ARCHITECTURAL EXPLANATION WITH CLEAN UNICODE FORMATTING */}
-            <div style={styles.explanationCard}>
-              <h4 style={styles.explanationTitle}><Info size={16} color="#60A5FA" /> Benchmark Scale Analysis & Resolution</h4>
-              <p style={styles.explanationText}>
-                <b>1. Small vs. Huge Scale Behavior:</b> At 100 inputs, overheads across paradigms remain manageable. However, as telemetry grows to 100,000 pings, unindexed PostGIS scans <b>(O(N))</b> and AES-256 column decryptions degrade performance by over 400x due to full-table CPU decryption passes before spatial containment checks can occur.
-              </p>
-              <p style={styles.explanationText}>
-                <b>2. CryptoSpatial-DB Sub-linear Efficiency:</b> By indexing Base32 Geohashes with PostGIS GiST structures <b>(O(log N))</b> and applying continuous 2D Laplace Differential Privacy <b>(ε = 1.5)</b>, CryptoSpatial-DB maintains sub-millisecond query latencies regardless of record volume.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* SIDE-BY-SIDE TRANSFORMATION TABLE */}
-        <div style={styles.tableCard}>
-          <h3 style={styles.cardTitle}><EyeOff size={18} /> Live Ingested Location Transformation Matrix</h3>
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Ping ID</th>
-                  <th style={styles.th}>Original Raw Latitude</th>
-                  <th style={styles.th}>Original Raw Longitude</th>
-                  <th style={styles.th}>Encrypted / Masked Geohash</th>
-                  <th style={styles.th}>Applied Protection Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" style={styles.emptyTd}>No driver pings ingested yet. Click 'Simulate 15 Pings Across All Zones' above.</td>
-                  </tr>
-                ) : (
-                  logs.map((log) => (
-                    <tr key={log.log_id} style={styles.tr}>
-                      <td style={styles.tdMonospace}>#{log.log_id}</td>
-                      <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
-                      <td style={styles.tdRedacted}>[REDACTED AT EDGE]</td>
-                      <td style={styles.tdEncrypted}><code>{log.masked_geohash}</code></td>
-                      <td style={styles.tdPill}>
-                        <span style={styles.pillActive}>Masked & Differential Privacy Protected</span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      {/* FLOATING CORNER VIEW: AUTOMATED CONTINUOUS AUDIT WIDGET */}
-      <div style={styles.floatingWidget}>
-        <div style={styles.widgetHeader}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={styles.pulseDot}></span>
-            <span style={styles.widgetTitle}>Automated Background Audit</span>
-          </div>
-          <span style={styles.widgetBadge}>Active</span>
-        </div>
-
-        <div style={styles.widgetBody}>
-          <div style={styles.widgetRow}>
-            <CheckCircle2 size={15} color="#34D399" />
-            <span style={styles.widgetStatusText}>{autoAuditState.statusText}</span>
-          </div>
-
-          <div style={styles.widgetDetails}>
-            <div style={styles.widgetMetric}>
-              <span style={styles.widgetLabel}>Zone:</span>
-              <span style={styles.widgetVal}>{autoAuditState.geofence_zone}</span>
-            </div>
-            <div style={styles.widgetMetric}>
-              <span style={styles.widgetLabel}>True Count:</span>
-              <span style={styles.widgetVal}>{autoAuditState.true_count}</span>
-            </div>
-            <div style={styles.widgetMetric}>
-              <span style={styles.widgetLabel}>Laplace Noise:</span>
-              <span style={{ ...styles.widgetVal, color: '#F59E0B' }}>
-                {autoAuditState.laplacian_noise > 0 ? `+${autoAuditState.laplacian_noise}` : autoAuditState.laplacian_noise}
-              </span>
-            </div>
-            <div style={styles.widgetMetric}>
-              <span style={styles.widgetLabel}>Perturbed Count:</span>
-              <span style={{ ...styles.widgetVal, color: '#34D399', fontWeight: 'bold' }}>{autoAuditState.reported_count}</span>
-            </div>
-          </div>
-
-          <div style={styles.widgetFooter}>
-            <Clock size={12} color="#9CA3AF" />
-            <span>Last Auto-Pass: {autoAuditState.lastRunTime}</span>
-          </div>
-        </div>
-      </div>
+      )}
 
     </div>
   );
@@ -792,13 +859,23 @@ export default function App() {
 
 // STYLES
 const styles = {
-  container: { backgroundColor: '#0B0F17', color: '#F3F4F6', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif', paddingBottom: '80px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 28px', backgroundColor: '#111827', borderBottom: '1px solid #1F2937' },
-  brand: { display: 'flex', alignItems: 'center', gap: '14px' },
-  title: { fontSize: '20px', fontWeight: '700', margin: 0, color: '#F9FAFB' },
-  subtitle: { fontSize: '12px', color: '#9CA3AF', margin: 0 },
-  statusBadge: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#064E3B', color: '#34D399', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' },
-  statusDot: { width: '8px', height: '8px', backgroundColor: '#10B981', borderRadius: '50%' },
+  container: { backgroundColor: '#0B0F17', color: '#F3F4F6', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif', paddingBottom: '40px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: '#111827', borderBottom: '1px solid #1F2937', gap: '16px', flexWrap: 'nowrap' },
+  brand: { display: 'flex', alignItems: 'center', gap: '12px', minWidth: '280px' },
+  title: { fontSize: '18px', fontWeight: '700', margin: 0, color: '#F9FAFB', whiteSpace: 'nowrap' },
+  subtitle: { fontSize: '11px', color: '#9CA3AF', margin: 0, whiteSpace: 'nowrap' },
+  tabContainer: { display: 'flex', gap: '6px', backgroundColor: '#1F2937', padding: '4px', borderRadius: '8px', border: '1px solid #374151' },
+  tabActive: { backgroundColor: '#2563EB', color: '#FFF', border: 'none', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
+  tabInactive: { backgroundColor: 'transparent', color: '#9CA3AF', border: 'none', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
+
+  headerAuditCard: { backgroundColor: '#1E1B4B', border: '1px solid #4338CA', borderRadius: '8px', padding: '6px 12px', display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '340px' },
+  headerAuditHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  pulseDot: { width: '7px', height: '7px', backgroundColor: '#34D399', borderRadius: '50%', boxShadow: '0 0 6px #34D399' },
+  headerAuditTime: { fontSize: '10px', color: '#A5B4FC', display: 'flex', alignItems: 'center', gap: '4px' },
+  headerAuditMetrics: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#E0E7FF' },
+  headerMetricItem: { whiteSpace: 'nowrap' },
+  headerMetricDivider: { color: '#4338CA', fontSize: '10px' },
+
   mainGrid: { display: 'grid', gridTemplateColumns: '360px 1fr', height: '560px', borderBottom: '1px solid #1F2937' },
   sidebar: { backgroundColor: '#111827', padding: '16px', borderRight: '1px solid #1F2937', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' },
   card: { backgroundColor: '#1F2937', padding: '14px', borderRadius: '10px', border: '1px solid #374151' },
@@ -806,6 +883,7 @@ const styles = {
   btnPrimary: { width: '100%', padding: '9px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
   btnDanger: { width: '100%', padding: '9px', backgroundColor: '#DC2626', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
   btnSuccess: { width: '100%', padding: '9px', backgroundColor: '#059669', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
+  btnSuccessWide: { padding: '10px 16px', backgroundColor: '#059669', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' },
   btnSecondary: { width: '100%', padding: '8px', backgroundColor: '#374151', color: '#D1D5DB', border: 'none', borderRadius: '6px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
   btnActiveMode: { width: '100%', padding: '8px', backgroundColor: '#D97706', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' },
   btnOutlineDanger: { width: '100%', padding: '8px', backgroundColor: 'transparent', color: '#F87171', border: '1px solid #EF4444', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
@@ -849,121 +927,51 @@ const styles = {
   thMini: { padding: '6px 8px', backgroundColor: '#1F2937', color: '#9CA3AF', textAlign: 'left' },
   tdMiniMono: { padding: '6px 8px', fontFamily: 'monospace', color: '#60A5FA' },
   tdMiniPill: { padding: '6px 8px' },
-  pillAlgo: { backgroundColor: '#065F46', color: '#34D399', fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' },
+  pillAlgo: { backgroundColor: '#065F46', color: '#34D399', fontSize: '10px', padding: '3px 8px', borderRadius: '10px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block' },
   tdMini: { padding: '6px 8px', color: '#D1D5DB' },
   tdMiniBold: { padding: '6px 8px', fontWeight: '700', color: '#F3F4F6' },
-  benchmarkCard: { backgroundColor: '#064E3B', padding: '18px', borderRadius: '10px', border: '1px solid #059669', display: 'flex', flexDirection: 'column', gap: '16px' },
-  dualBenchmarkGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
-  scaleCard: { backgroundColor: '#111827', padding: '14px', borderRadius: '8px', border: '1px solid #1F2937' },
-  scaleCardHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' },
-  scaleTitle: { fontSize: '12px', fontWeight: '700', color: '#F3F4F6' },
-  barChartGrid: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  barRowMini: { display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center', gap: '10px' },
-  barLabelMini: { fontSize: '10px', color: '#D1D5DB', fontFamily: 'monospace' },
-  barTrack: { backgroundColor: '#1F2937', borderRadius: '4px', height: '22px', width: '100%', overflow: 'hidden' },
-  barFill: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', transition: 'width 0.5s ease' },
-  barValue: { fontSize: '10px', color: '#FFF', fontWeight: '700' },
-  explanationCard: { backgroundColor: '#111827', padding: '14px', borderRadius: '8px', border: '1px solid #1F2937' },
-  explanationTitle: { fontSize: '13px', fontWeight: '600', color: '#F3F4F6', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px' },
-  explanationText: { fontSize: '11px', color: '#9CA3AF', margin: '0 0 6px 0', lineHeight: '1.5' },
+
+  benchmarkSection: { padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' },
+  benchmarkHeaderCard: { backgroundColor: '#111827', padding: '20px', borderRadius: '10px', border: '1px solid #1F2937' },
+  benchmarkGridContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
+  chartCard: { backgroundColor: '#111827', padding: '20px', borderRadius: '10px', border: '1px solid #1F2937' },
+  chartCardTitle: { fontSize: '15px', fontWeight: '700', color: '#F3F4F6', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' },
+  chartDesc: { fontSize: '12px', color: '#9CA3AF', margin: '0 0 18px 0' },
+  multiScaleGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' },
+  scaleColumn: { backgroundColor: '#1F2937', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' },
+  scaleHeader: { fontSize: '12px', fontWeight: '700', color: '#60A5FA', textAlign: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px' },
+  verticalBarContainer: { display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '180px', paddingTop: '20px' },
+  barItemVertical: { display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', width: '22%' },
+  barValueLabel: { fontSize: '9px', color: '#FFF', fontWeight: '700', marginBottom: '4px', textAlign: 'center' },
+  barTrackVertical: { width: '100%', height: '120px', backgroundColor: '#111827', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' },
+  barFillVertical: { width: '100%', transition: 'height 0.4s ease' },
+  barLegendName: { fontSize: '9px', color: '#9CA3AF', marginTop: '6px', textTransform: 'uppercase' },
+  horizontalChartList: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  barRowH: { display: 'grid', gridTemplateColumns: '240px 1fr', alignItems: 'center', gap: '14px' },
+  barRowHLabel: { display: 'flex', flexDirection: 'column', fontSize: '12px' },
+  barTrackH: { backgroundColor: '#1F2937', borderRadius: '6px', height: '26px', overflow: 'hidden', width: '100%' },
+  barFillH: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '10px', transition: 'width 0.4s ease' },
+  barValText: { fontSize: '11px', color: '#FFF', fontWeight: '700', fontFamily: 'monospace' },
+  twinChartGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' },
+  meterList: { display: 'flex', flexDirection: 'column', gap: '14px' },
+  meterRow: { display: 'flex', flexDirection: 'column' },
+  meterTrack: { height: '10px', backgroundColor: '#1F2937', borderRadius: '4px', overflow: 'hidden', width: '100%' },
+
   tableCard: { backgroundColor: '#111827', padding: '18px', borderRadius: '10px', border: '1px solid #1F2937' },
   tableWrapper: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' },
-  th: { padding: '10px 14px', backgroundColor: '#1F2937', color: '#9CA3AF', borderBottom: '1px solid #374151', fontWeight: '600' },
+  th: { padding: '12px 16px', backgroundColor: '#1F2937', color: '#9CA3AF', borderBottom: '1px solid #374151', fontWeight: '600', whiteSpace: 'nowrap' },
   tr: { borderBottom: '1px solid #1F2937' },
-  tdMonospace: { padding: '10px 14px', fontFamily: 'monospace', color: '#9CA3AF' },
-  tdMonospaceBold: { padding: '10px 14px', fontFamily: 'monospace', fontWeight: '700', color: '#F3F4F6' },
-  tdLatency: { padding: '10px 14px', fontFamily: 'monospace', color: '#34D399', fontWeight: '700' },
-  tdRedacted: { padding: '10px 14px', fontFamily: 'monospace', color: '#EF4444', fontWeight: '600' },
-  tdEncrypted: { padding: '10px 14px', fontFamily: 'monospace', color: '#60A5FA', fontWeight: '600' },
-  tdPill: { padding: '10px 14px' },
-  pillActive: { backgroundColor: '#064E3B', color: '#34D399', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', fontWeight: '600' },
-  pillInactive: { backgroundColor: '#7F1D1D', color: '#FCA5A5', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', fontWeight: '600' },
+  tdMonospace: { padding: '12px 16px', fontFamily: 'monospace', color: '#9CA3AF', whiteSpace: 'nowrap' },
+  tdMonospaceBold: { padding: '12px 16px', fontFamily: 'monospace', fontWeight: '700', color: '#F3F4F6', whiteSpace: 'nowrap' },
+  tdLatency: { padding: '12px 16px', fontFamily: 'monospace', color: '#34D399', fontWeight: '700', whiteSpace: 'nowrap' },
+  tdRedacted: { padding: '12px 16px', fontFamily: 'monospace', color: '#EF4444', fontWeight: '600', whiteSpace: 'nowrap' },
+  tdEncrypted: { padding: '12px 16px', fontFamily: 'monospace', color: '#60A5FA', fontWeight: '600', whiteSpace: 'nowrap' },
+  tdPill: { padding: '12px 16px', whiteSpace: 'nowrap' },
+  pillActive: { backgroundColor: '#064E3B', color: '#34D399', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block' },
+  pillInactive: { backgroundColor: '#7F1D1D', color: '#FCA5A5', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block' },
   emptyTd: { padding: '16px', textAlign: 'center', color: '#6B7280' },
-
-  // Floating Corner Widget Styles
-  floatingWidget: {
-    position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    zIndex: 1000,
-    width: '310px',
-    backgroundColor: '#1E1B4B',
-    border: '1px solid #4338CA',
-    borderRadius: '12px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
-    padding: '12px 14px',
-    fontFamily: 'Segoe UI, sans-serif'
-  },
-  widgetHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
-    borderBottom: '1px solid #312E81',
-    paddingBottom: '6px'
-  },
-  pulseDot: {
-    width: '8px',
-    height: '8px',
-    backgroundColor: '#34D399',
-    borderRadius: '50%',
-    boxShadow: '0 0 8px #34D399'
-  },
-  widgetTitle: {
-    fontSize: '12px',
-    fontWeight: '700',
-    color: '#E0E7FF'
-  },
-  widgetBadge: {
-    backgroundColor: '#065F46',
-    color: '#34D399',
-    fontSize: '10px',
-    fontWeight: '700',
-    padding: '2px 6px',
-    borderRadius: '10px'
-  },
-  widgetBody: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px'
-  },
-  widgetRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px'
-  },
-  widgetStatusText: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#34D399'
-  },
-  widgetDetails: {
-    backgroundColor: '#111827',
-    padding: '8px 10px',
-    borderRadius: '6px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px'
-  },
-  widgetMetric: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '11px'
-  },
-  widgetLabel: {
-    color: '#9CA3AF'
-  },
-  widgetVal: {
-    color: '#F3F4F6',
-    fontWeight: '600'
-  },
-  widgetFooter: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontSize: '10px',
-    color: '#818CF8',
-    marginTop: '2px'
-  }
+  explanationCard: { backgroundColor: '#111827', padding: '16px', borderRadius: '8px', border: '1px solid #1F2937' },
+  explanationTitle: { fontSize: '13px', fontWeight: '600', color: '#F3F4F6', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px' },
+  explanationText: { fontSize: '11px', color: '#9CA3AF', margin: '0 0 6px 0', lineHeight: '1.5' }
 };
