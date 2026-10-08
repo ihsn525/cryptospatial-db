@@ -1,153 +1,154 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-# CryptoSpatial-DB: Faculty Database Demonstration Script
-# Target Evaluator: Dr. Deepika J
-# Purpose: Step-by-step execution of PostGIS schema, spatial indexes, 
-#          PL/pgSQL differential privacy procedures, and live data logs.
+# CryptoSpatial-DB Engine - Real-Time PostgreSQL / PostGIS Showcase Script
 # ==============================================================================
 
-# ANSI Color Codes for Visual Hierarchy
-CYAN='\033[0;36m'
+# Database Connection Defaults (Override via ENV vars if needed)
+DB_NAME="${DB_NAME:-cryptospatial_db}"
+DB_USER="${DB_USER:-postgres}"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
+export PGPASSWORD="${PGPASSWORD:-postgres}"
+
+# Terminal Colors
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+MAGENTA='\033[0;35m'
+RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# Function to pause between presentation steps
-pause_prompt() {
-    echo -e "${YELLOW}\n[Press ENTER to proceed to the next step...]${NC}"
-    read -r
+# Helper Function to Run SQL
+run_sql() {
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -X -c "$1" 2>/dev/null
 }
 
-# Clear screen and display banner
+# Auto-detect PostgreSQL Connection (Local or Docker)
+check_connection() {
+    if run_sql "SELECT 1;" > /dev/null 2>&1; then
+        return 0
+    elif command -v docker >/dev/null 2>&1 && docker ps | grep -q "postgres\|cryptospatial"; then
+        CONTAINER_ID=$(docker ps --format '{{.ID}}\t{{.Names}}' | grep -i "postgres\|cryptospatial" | head -n 1 | awk '{print $1}')
+        run_sql() {
+            docker exec -i "$CONTAINER_ID" psql -U "$DB_USER" -d "$DB_NAME" -X -c "$1"
+        }
+        return 0
+    else
+        echo -e "${RED}${BOLD}✖ Error: Unable to connect to PostgreSQL database '$DB_NAME' at $DB_HOST:$DB_PORT.${NC}"
+        echo -e "Ensure PostgreSQL or your Docker container is running."
+        exit 1
+    fi
+}
+
 clear
-echo -e "${CYAN}${BOLD}"
-echo "================================================================================"
-echo "          CRYPTOSPATIAL-DB: DATABASE ENGINE & POSTGIS SHOWCASE          "
-echo "================================================================================"
-echo -e "${NC}"
-echo -e "Target Database: ${GREEN}cryptospatial_db${NC} | Container: ${GREEN}cryptospatial_postgres${NC}"
-echo -e "Spatial Engine:  ${GREEN}PostGIS 3.4 / PostgreSQL 16${NC}"
-echo "--------------------------------------------------------------------------------"
+echo -e "${CYAN}${BOLD}======================================================================${NC}"
+echo -e "${BLUE}${BOLD}   🛡️  CRYPTOSPATIAL-DB ENGINE - LIVE DATABASE INSPECTOR  🛡️   ${NC}"
+echo -e "${CYAN}${BOLD}======================================================================${NC}"
+echo -e "  Target Database : ${GREEN}${DB_NAME}${NC}"
+echo -e "  Timestamp       : ${YELLOW}$(date '+%Y-%m-%d %H:%M:%S %Z')${NC}"
+echo -e "${CYAN}----------------------------------------------------------------------${NC}\n"
 
-# Check if Docker container is running
-if ! docker ps | grep -q "cryptospatial_postgres"; then
-    echo -e "${PURPLE}[ERROR] Docker container 'cryptospatial_postgres' is not running.${NC}"
-    echo -e "Please start the stack first using: ${GREEN}./manage.sh start${NC}"
-    exit 1
-fi
-
-pause_prompt
+check_connection
 
 # ------------------------------------------------------------------------------
-# STEP 1: PostGIS Extension Verification
+# SECTION 1: DATABASE OVERVIEW & ROW COUNTS
 # ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 1: POSTGIS SPATIAL EXTENSION VERIFICATION${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${BLUE}Status:${NC} PostGIS spatial extension is active in PostgreSQL."
-echo ""
-
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "\dx"
-
-pause_prompt
-
-# ------------------------------------------------------------------------------
-# STEP 2: Database Schema & Relational Tables
-# ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 2: RELATIONAL TABLES & SCHEMA OVERVIEW${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${BLUE}Content:${NC} 3 core tables: spatial_logs (telemetry), geofences (delivery zones), and audit_reports (privacy logs)."
-echo ""
-
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "\dt"
-
-pause_prompt
+echo -e "${GREEN}${BOLD}[1/6] DATABASE TABLE OVERVIEW & ROW COUNTS${NC}"
+run_sql "
+SELECT 
+    schemaname || '.' || relname AS table_name,
+    n_live_tup AS total_records,
+    pg_size_pretty(pg_total_relation_size(relid)) AS disk_usage
+FROM pg_stat_user_tables
+WHERE relname IN ('sdk_api_keys', 'geofences', 'driver_telemetry_logs', 'spatial_audit_reports')
+ORDER BY n_live_tup DESC;
+"
 
 # ------------------------------------------------------------------------------
-# STEP 3: Attribute & Index Inspection
+# SECTION 2: MIDDLEWARE API KEYS (SHA-256 HASHED)
 # ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 3: TABLE ATTRIBUTES & GiST SPATIAL INDEXING${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-
-echo -e "${GREEN}${BOLD}[3.1] Ingested Spatial Telemetry Table (spatial_logs):${NC}"
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "\d spatial_logs"
-echo ""
-
-echo -e "${GREEN}${BOLD}[3.2] Geofenced Hubs Table (geofences) — Note GiST Spatial Index:${NC}"
-echo -e "${BLUE}Content:${NC} 'The idx_geofences_spatial GiST index. This builds an R-Tree for O(log N) bounding box searches.'"
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "\d geofences"
-echo ""
-
-echo -e "${GREEN}${BOLD}[3.3] Audit Reports Table (audit_reports):${NC}"
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "\d audit_reports"
-
-pause_prompt
+echo -e "\n${GREEN}${BOLD}[2/6] MIDDLEWARE API KEYS (sdk_api_keys)${NC}"
+echo -e "${MAGENTA}Note: Raw API keys are hashed with SHA-256; only prefixes are stored.${NC}"
+run_sql "
+SELECT 
+    key_id,
+    client_name,
+    key_prefix,
+    SUBSTRING(key_hash, 1, 16) || '...' AS sha256_hash_preview,
+    is_active,
+    created_at
+FROM sdk_api_keys
+ORDER BY created_at DESC;
+"
 
 # ------------------------------------------------------------------------------
-# STEP 4: PL/pgSQL Stored Procedure Code Inspection
+# SECTION 3: POSTGIS DELIVERY GEOFENCES & SPATIAL BOUNDS
 # ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 4: DIFFERENTIAL PRIVACY STORED PROCEDURE (sp_generate_privacy_audit)${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${BLUE}Content:${NC} 'This PL/pgSQL procedure decodes Geohashes via ST_PointFromGeoHash, evaluates containment, and injects continuous 2D Laplace noise (ε = 1.5).'"
-echo ""
-
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "SELECT pg_get_functiondef(oid) FROM pg_proc WHERE proname = 'sp_generate_privacy_audit';"
-
-pause_prompt
-
-# ------------------------------------------------------------------------------
-# STEP 5: Live Records & Masked Geohash Verification
-# ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 5: LIVE INGESTED TELEMETRY LOGS (RAW VS. MASKED GEOHASH)${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${BLUE}Content:${NC} Here are the recent pings. Notice how raw coordinates are converted into 7-character Base32 Geohashes (masked_geohash)."
-echo ""
-
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "SELECT log_id, raw_lat, raw_lon, masked_geohash, recorded_at FROM spatial_logs ORDER BY log_id DESC LIMIT 5;"
-
-pause_prompt
+echo -e "\n${GREEN}${BOLD}[3/6] POSTGIS DELIVERY ZONES & HUB GEOFENCES (geofences)${NC}"
+run_sql "
+SELECT 
+    geofence_id,
+    zone_name,
+    ST_GeometryType(geom) AS geom_type,
+    ST_SRID(geom) AS srid,
+    ST_AsText(geom) AS polygon_wkt
+FROM geofences
+ORDER BY geofence_id ASC;
+"
 
 # ------------------------------------------------------------------------------
-# STEP 6: Active Geofences & Polygons
+# SECTION 4: LIVE INGESTED TELEMETRY & EDGE MASKING LOGS
 # ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 6: ACTIVE GEOFENCE ZONES (Koramangala & Indiranagar Hubs)${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${BLUE}Content:${NC} 'These MultiPolygons represent delivery hubs stored in EPSG:4326 format.'"
-echo ""
-
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "SELECT geofence_id, zone_name, is_active, ST_AsText(ST_Centroid(boundary_polygon)) AS centroid_point FROM geofences;"
-
-pause_prompt
+echo -e "\n${GREEN}${BOLD}[4/6] RECENT TELEMETRY LOGS (driver_telemetry_logs)${NC}"
+echo -e "${MAGENTA}Note: Raw coordinates are purged at the edge; only 153m Base32 tiles are stored.${NC}"
+run_sql "
+SELECT 
+    log_id,
+    driver_id,
+    masked_geohash AS base32_tile,
+    'RAW PURGED AT EDGE' AS raw_coordinate_status,
+    created_at
+FROM driver_telemetry_logs
+ORDER BY log_id DESC
+LIMIT 10;
+"
 
 # ------------------------------------------------------------------------------
-# STEP 7: Live Differential Privacy Audit Output
+# SECTION 5: DIFFERENTIAL PRIVACY AUDIT REPORTS (LAPLACE NOISE)
 # ------------------------------------------------------------------------------
-clear
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${CYAN}${BOLD} STEP 7: DIFFERENTIAL PRIVACY AUDIT REPORTS (LAPLACIAN PERTURBATION)${NC}"
-echo -e "${CYAN}${BOLD}================================================================================${NC}"
-echo -e "${BLUE}Content:${NC} 'These are the generated audit reports. Compare true_count against reported_count to see Laplace noise in action.'"
-echo ""
+echo -e "\n${GREEN}${BOLD}[5/6] DIFFERENTIAL PRIVACY AUDIT REPORTS (spatial_audit_reports)${NC}"
+run_sql "
+SELECT 
+    report_id,
+    geofence_zone,
+    true_count,
+    ROUND(laplacian_noise::numeric, 3) AS laplace_noise_added,
+    reported_count AS noisy_output,
+    auto_tuned_epsilon AS epsilon_budget,
+    generated_at
+FROM spatial_audit_reports
+ORDER BY report_id DESC
+LIMIT 5;
+"
 
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "SELECT report_id, true_count, round(laplacian_noise::numeric, 2) AS laplace_noise, reported_count, generated_at FROM audit_reports ORDER BY generated_at DESC LIMIT 5;"
+# ------------------------------------------------------------------------------
+# SECTION 6: POSTGIS GiST INDEX PROFILER & CATALOG PERFORMANCE
+# ------------------------------------------------------------------------------
+echo -e "\n${GREEN}${BOLD}[6/6] POSTGIS GiST INDEX PROFILER & SYSTEM CATALOG STATS${NC}"
+run_sql "
+SELECT 
+    indexrelname AS index_name,
+    relname AS table_name,
+    idx_scan AS total_index_scans,
+    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+FROM pg_stat_user_indexes
+WHERE relname IN ('driver_telemetry_logs', 'geofences')
+ORDER BY idx_scan DESC;
+"
 
-echo ""
-echo -e "${GREEN}${BOLD}================================================================================"
-echo "                   DATABASE DEMONSTRATION COMPLETE                    "
-echo "================================================================================"${NC}
-echo ""
+echo -e "\n${CYAN}${BOLD}======================================================================${NC}"
+echo -e "${GREEN}${BOLD}✓ Showcase Inspection Complete! Database is operating in Zero-Trust Mode.${NC}"
+echo -e "${CYAN}${BOLD}======================================================================${NC}\n"

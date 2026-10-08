@@ -159,3 +159,14 @@ INSERT INTO roles (role_id, role_name, description) VALUES
 (2, 'AUDITOR', 'Privacy Compliance Auditor'),
 (3, 'DRIVER', 'Delivery Partner / Field Operator')
 ON CONFLICT (role_id) DO NOTHING;
+
+-- 9. API_KEYS Table
+CREATE TABLE IF NOT EXISTS api_keys (
+    key_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_name VARCHAR(100) NOT NULL,
+    api_key VARCHAR(64) UNIQUE NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);

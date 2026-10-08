@@ -1,62 +1,53 @@
+// src/App.jsx
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Rectangle, Popup, Polyline, useMapEvents, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
 import axios from 'axios';
 import {
   ShieldAlert, Radio, Activity, RefreshCw, Zap,
-  EyeOff, Trash2, Cpu, BarChart3, PlusCircle, MapPin, MousePointer, Info, AlertTriangle, Edit2, Check, X, Database, Clock, LayoutDashboard, Sliders
+  EyeOff, Trash2, Cpu, BarChart3, PlusCircle, MapPin, MousePointer, Info, AlertTriangle, Edit2, Check, X, Database, Clock, LayoutDashboard, Sliders,
+  Key, Copy, Plus, Lock, Unlock, Siren, AlertCircle, ChevronLeft, ChevronRight, Grid
 } from 'lucide-react';
 
-const API_BASE = 'http://127.0.0.1:8000/api/v1';
+const API_BASE = 'http://127.0.0.1:8000';
 
-// Helper to generate dynamic driver IDs
-const generateDriverId = () => `DRV-${Math.floor(100 + Math.random() * 900)}`;
-
-// Geohash Encoder Function for Edge Privacy Masking
-function encodeGeohash(latitude, longitude, precision = 7) {
-  const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
-  let latInterval = [-90.0, 90.0];
-  let lonInterval = [-180.0, 180.0];
-  let geohash = '';
-  let bits = [16, 8, 4, 2, 1];
-  let bit = 0;
-  let ch = 0;
-  let even = true;
-
-  while (geohash.length < precision) {
-    if (even) {
-      let mid = (lonInterval[0] + lonInterval[1]) / 2;
-      if (longitude > mid) {
-        ch |= bits[bit];
-        lonInterval[0] = mid;
-      } else {
-        lonInterval[1] = mid;
-      }
-    } else {
-      let mid = (latInterval[0] + latInterval[1]) / 2;
-      if (latitude > mid) {
-        ch |= bits[bit];
-        latInterval[0] = mid;
-      } else {
-        latInterval[1] = mid;
-      }
-    }
-    even = !even;
-    if (bit < 4) {
-      bit++;
-    } else {
-      geohash += BASE32[ch];
-      bit = 0;
-      ch = 0;
-    }
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
-  return geohash;
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("React Error Boundary caught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '30px', backgroundColor: '#111827', color: '#F87171', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
+          <h2 style={{ margin: '0 0 10px 0' }}>Dashboard Exception Intercepted</h2>
+          <p style={{ color: '#D1D5DB', fontSize: '14px' }}>{this.state.error?.toString()}</p>
+          <button
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{ padding: '10px 16px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '16px', fontWeight: '600' }}
+          >
+            Reset Dashboard Workspace
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
-// Geohash Decoder Function
-function decodeGeohash(geohash) {
-  if (!geohash || typeof geohash !== 'string') return [12.9352, 77.6245];
+// Decode Base32 Geohash into 153m x 153m Bounding Box Coordinates [[latMin, lonMin], [latMax, lonMax]]
+function decodeGeohashBounds(geohash) {
+  if (!geohash || typeof geohash !== 'string') return [[12.9345, 77.6240], [12.9358, 77.6252]];
   const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
   let latInterval = [-90.0, 90.0];
   let lonInterval = [-180.0, 180.0];
@@ -80,67 +71,289 @@ function decodeGeohash(geohash) {
     }
   }
 
-  const lat = (latInterval[0] + latInterval[1]) / 2;
-  const lon = (lonInterval[0] + lonInterval[1]) / 2;
-
-  if (isNaN(lat) || isNaN(lon)) return [12.9352, 77.6245];
-  return [lat, lon];
+  return [[latInterval[0], lonInterval[0]], [latInterval[1], lonInterval[1]]];
 }
 
-// React Error Boundary Component
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("React Error Boundary caught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '30px', backgroundColor: '#111827', color: '#F87171', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
-          <h2 style={{ margin: '0 0 10px 0' }}>Application UI Error Boundary Caught An Exception</h2>
-          <p style={{ color: '#D1D5DB', fontSize: '14px' }}>{this.state.error?.toString()}</p>
-          <button
-            onClick={() => { localStorage.clear(); window.location.reload(); }}
-            style={{ padding: '10px 16px', backgroundColor: '#2563EB', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '16px', fontWeight: '600' }}
-          >
-            Reset Dashboard
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-// Map Auto-Recenter Controller Component
-function MapRecenter({ center }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
-      map.flyTo(center, 15, { animate: true, duration: 1.0 });
-    }
-  }, [center, map]);
-  return null;
+function decodeGeohash(geohash) {
+  const bounds = decodeGeohashBounds(geohash);
+  return [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
 }
 
 function MapClickHandler({ mapMode, onMapClick }) {
   useMapEvents({
     click(e) {
-      if (e.latlng && mapMode !== 'geofence') {
+      if (mapMode !== 'none' && e.latlng) {
         onMapClick([e.latlng.lat, e.latlng.lng]);
       }
     }
   });
   return null;
+}
+
+// SECURE ONE-TIME API KEY GENERATED DISPLAY MODAL
+function OneTimeKeyDisplayModal({ rawKey, clientName, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(rawKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #10B981', width: '450px', color: '#FFF' }}>
+        <h3 style={{ margin: '0 0 8px 0', color: '#34D399', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Key size={20} /> Production API Key Generated
+        </h3>
+        <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 14px 0' }}>
+          Target Platform: <b>{clientName}</b>
+        </p>
+
+        <div style={{ backgroundColor: '#7F1D1D', border: '1px solid #EF4444', padding: '10px', borderRadius: '6px', fontSize: '11px', color: '#FCA5A5', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <AlertCircle size={18} color="#F87171" />
+          <span><b>CRITICAL:</b> Copy and save this API key now. For maximum security, it is stored as a SHA-256 hash and will NEVER be displayed again!</span>
+        </div>
+
+        <div style={{ backgroundColor: '#0F172A', padding: '12px', borderRadius: '6px', border: '1px solid #334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <code style={{ fontSize: '13px', color: '#38BDF8', fontWeight: 'bold', wordBreak: 'break-all' }}>{rawKey}</code>
+          <button onClick={copyToClipboard} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', paddingLeft: '8px' }}>
+            {copied ? <Check size={18} color="#10B981" /> : <Copy size={18} />}
+          </button>
+        </div>
+
+        <button onClick={onClose} className="btn-success" style={{ marginTop: '16px', width: '100%' }}>
+          I Have Saved My API Key
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ADMIN PASSKEY PROTECTED KEY DELETION MODAL
+function AdminDeleteKeyModal({ keyItem, onClose, onSuccess }) {
+  const [passkey, setPasskey] = useState('admin_secret_passkey_2026');
+  const [error, setError] = useState('');
+
+  const handleDelete = async () => {
+    setError('');
+    try {
+      await axios.delete(`${API_BASE}/v1/sdk/keys/${keyItem.key_id}`, {
+        headers: { "X-Admin-Passkey": passkey }
+      });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError('Forbidden: Invalid Administrative Passkey!');
+      }
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#1E293B', padding: '20px', borderRadius: '10px', border: '1px solid #DC2626', width: '380px', color: '#FFF' }}>
+        <h4 style={{ margin: '0 0 8px 0', color: '#F87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Lock size={18} /> Admin Authorization Required
+        </h4>
+        <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 12px 0' }}>
+          Enter Administrative Passkey to revoke key for <b>{keyItem.client_name}</b> (<code>{keyItem.key_prefix}</code>).
+        </p>
+
+        <input
+          type="password"
+          value={passkey}
+          onChange={(e) => setPasskey(e.target.value)}
+          className="input-mini"
+          placeholder="Admin Passkey"
+          style={{ marginBottom: '12px' }}
+        />
+
+        {error && <div style={{ fontSize: '11px', color: '#F87171', marginBottom: '10px' }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={handleDelete} className="btn-danger" style={{ flex: 1, marginBottom: 0 }}>Confirm Revoke</button>
+          <button onClick={onClose} className="btn-secondary" style={{ flex: 1, marginBottom: 0 }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// API KEY MANAGER WIDGET
+function ApiKeyManager() {
+  const [clientName, setClientName] = useState('Swiggy Logistics Partner');
+  const [generatedRawKey, setGeneratedRawKey] = useState('');
+  const [keysList, setKeysList] = useState([]);
+  const [deletingKeyItem, setDeletingKeyItem] = useState(null);
+
+  const fetchKeys = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/v1/sdk/keys/list`);
+      if (res.data && res.data.data) {
+        setKeysList(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch API keys:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchKeys();
+  }, []);
+
+  const handleGenerateKey = async () => {
+    try {
+      const res = await axios.post(`${API_BASE}/v1/sdk/keys/generate`, {
+        client_name: clientName
+      });
+      setGeneratedRawKey(res.data.raw_api_key);
+      await fetchKeys();
+    } catch (err) {
+      alert('Failed to generate API Key');
+    }
+  };
+
+  return (
+    <div className="card">
+      {generatedRawKey && (
+        <OneTimeKeyDisplayModal
+          rawKey={generatedRawKey}
+          clientName={clientName}
+          onClose={() => setGeneratedRawKey('')}
+        />
+      )}
+
+      {deletingKeyItem && (
+        <AdminDeleteKeyModal
+          keyItem={deletingKeyItem}
+          onClose={() => setDeletingKeyItem(null)}
+          onSuccess={fetchKeys}
+        />
+      )}
+
+      <h3 className="card-title">
+        <Key size={18} color="#60A5FA" /> Middleware API Key Manager
+      </h3>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <label className="input-label">Client / Platform Integration:</label>
+        <input
+          type="text"
+          value={clientName}
+          onChange={(e) => setClientName(e.target.value)}
+          className="input-mini"
+        />
+        <button onClick={handleGenerateKey} className="btn-primary">
+          <Plus size={15} /> Generate Production API Key
+        </button>
+      </div>
+
+      <div style={{ marginTop: '12px' }}>
+        <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Active Integration Keys ({keysList.length}):</span>
+        <div style={{ maxHeight: '110px', overflowY: 'auto', marginTop: '4px' }}>
+          {keysList.map((k) => (
+            <div key={k.key_id} style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #374151' }}>
+              <div>
+                <span style={{ color: '#E5E7EB', fontWeight: 'bold', display: 'block' }}>{k.client_name}</span>
+                <code style={{ color: '#60A5FA' }}>{k.key_prefix}</code>
+              </div>
+              <button onClick={() => setDeletingKeyItem(k)} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer' }}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// BREAK-GLASS MODAL
+function BreakGlassModal({ onClose, logs }) {
+  const [driverId, setDriverId] = useState('DRV-9042');
+  const [key1, setKey1] = useState('ADMIN-KEY-99');
+  const [key2, setKey2] = useState('POLICE-KEY-42');
+  const [key3, setKey3] = useState('');
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleUnmask = async () => {
+    setError('');
+    setResult(null);
+    try {
+      const activeKeys = [key1, key2, key3].filter(k => k.trim().length > 0);
+      const res = await axios.post(`${API_BASE}/v1/sdk/emergency/break-glass`, {
+        driver_id: driverId,
+        quorum_keys: activeKeys
+      });
+      setResult(res.data);
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError('Quorum Authorization Failed: Requires 2-of-3 valid secret keys!');
+      }
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #DC2626', width: '420px', color: '#FFF' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, color: '#F87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Siren size={20} /> Emergency Quorum Break-Glass
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}><X size={20} /></button>
+        </div>
+
+        <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 12px 0' }}>
+          Requires <b>2-of-3 Multi-Party Secret Keys</b> (Admin, Law Enforcement, Auditor) to unmask raw coordinates.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div>
+            <label className="input-label">Target Driver ID:</label>
+            <input type="text" value={driverId} onChange={e => setDriverId(e.target.value)} className="input-mini" />
+          </div>
+          <div>
+            <label className="input-label">Key 1 (Admin Key):</label>
+            <input type="password" value={key1} onChange={e => setKey1(e.target.value)} className="input-mini" placeholder="ADMIN-KEY-99" />
+          </div>
+          <div>
+            <label className="input-label">Key 2 (Law Enforcement Key):</label>
+            <input type="password" value={key2} onChange={e => setKey2(e.target.value)} className="input-mini" placeholder="POLICE-KEY-42" />
+          </div>
+          <div>
+            <label className="input-label">Key 3 (Auditor Key):</label>
+            <input type="password" value={key3} onChange={e => setKey3(e.target.value)} className="input-mini" placeholder="AUDIT-KEY-71" />
+          </div>
+
+          <button onClick={handleUnmask} className="btn-danger" style={{ marginTop: '8px' }}>
+            <Unlock size={16} /> Authorize & Unmask Emergency Coordinates
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#7F1D1D', border: '1px solid #EF4444', color: '#FCA5A5', borderRadius: '6px', fontSize: '11px' }}>
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#064E3B', border: '1px solid #10B981', borderRadius: '6px' }}>
+            <span style={{ fontSize: '11px', color: '#34D399', fontWeight: 'bold' }}>✓ Quorum Verified (Incident Logged):</span>
+            <div style={{ fontSize: '12px', color: '#FFF', marginTop: '4px' }}>
+              <b>Latitude:</b> {result.unmasked_latitude}<br />
+              <b>Longitude:</b> {result.unmasked_longitude}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function MainApp() {
@@ -151,14 +364,10 @@ function MainApp() {
   const [benchmarkData, setBenchmarkData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastAudit, setLastAudit] = useState(null);
+  const [auditZoneIndex, setAuditZoneIndex] = useState(0);
   const [activeGeofences, setActiveGeofences] = useState([]);
+  const [showBreakGlass, setShowBreakGlass] = useState(false);
 
-  // Map Viewport and Focal Marker States
-  const [mapCenter, setMapCenter] = useState([12.9352, 77.6245]);
-  const [latestIngestedPing, setLatestIngestedPing] = useState(null);
-  const [selectedPin, setSelectedPin] = useState(null);
-
-  // Automated Background Audit State
   const [autoAuditState, setAutoAuditState] = useState({
     active: true,
     lastRunTime: 'Just Now',
@@ -176,15 +385,15 @@ function MainApp() {
   const [drawnGeofencePoints, setDrawnGeofencePoints] = useState([]);
   const [customZoneName, setCustomZoneName] = useState('Koramangala Extension');
 
-  // Custom Ingestion Inputs with Dynamic Driver ID
-  const [customDriverId, setCustomDriverId] = useState(generateDriverId());
+  const [customDriverId, setCustomDriverId] = useState('DRV-888');
   const [customLat, setCustomLat] = useState('12.9352');
   const [customLon, setCustomLon] = useState('77.6245');
   const [validationError, setValidationError] = useState('');
+  const [totalPingsCount, setTotalPingsCount] = useState(0);
 
   const fetchGeofences = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/geofences`);
+      const res = await axios.get(`${API_BASE}/api/v1/geofences`);
       if (res.data && Array.isArray(res.data.data)) {
         setActiveGeofences(res.data.data);
       }
@@ -195,9 +404,11 @@ function MainApp() {
 
   const fetchLogs = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/spatial-logs?limit=100`);
-      if (res.data && Array.isArray(res.data.data)) {
-        setLogs(res.data.data);
+      const res = await axios.get(`${API_BASE}/api/v1/spatial-logs?limit=1000`);
+      if (res.data) {
+        const logData = Array.isArray(res.data.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+        setLogs(logData);
+        setTotalPingsCount(res.data.total_count ?? res.data.count ?? logData.length);
       }
     } catch (err) {
       console.error('Failed to fetch spatial logs:', err);
@@ -206,7 +417,7 @@ function MainApp() {
 
   const fetchReports = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/audit-reports`);
+      const res = await axios.get(`${API_BASE}/api/v1/audit-reports`);
       if (res.data && Array.isArray(res.data.data)) {
         setReports(res.data.data);
       }
@@ -217,7 +428,7 @@ function MainApp() {
 
   const fetchIndexMetadata = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/system/indexing-metadata`);
+      const res = await axios.get(`${API_BASE}/api/v1/system/indexing-metadata`);
       if (res.data && Array.isArray(res.data.index_metadata)) {
         setIndexMetadata(res.data.index_metadata);
       }
@@ -228,7 +439,7 @@ function MainApp() {
 
   const pollAutomatedAudit = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/audit/latest`);
+      const res = await axios.get(`${API_BASE}/api/v1/audit/latest`);
       if (res.data && res.data.has_audit) {
         setAutoAuditState({
           active: true,
@@ -245,9 +456,10 @@ function MainApp() {
     }
   };
 
+  // UNIFIED LIVE SYNC POLLING LOOP (EVERY 3 SECONDS)
   useEffect(() => {
     const init = async () => {
-      await axios.post(`${API_BASE}/seed-geofences`).catch(() => { });
+      await axios.post(`${API_BASE}/api/v1/seed-geofences`).catch(() => { });
       await fetchGeofences();
       await fetchLogs();
       await fetchReports();
@@ -256,45 +468,43 @@ function MainApp() {
     };
     init();
 
-    const interval = setInterval(() => {
-      pollAutomatedAudit();
-    }, 4000);
+    const interval = setInterval(async () => {
+      await fetchLogs();
+      await fetchReports();
+      await fetchIndexMetadata();
+      await pollAutomatedAudit();
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
 
-  const handleMapClick = (coords) => {
+  const handleMapClick = async (coords) => {
     if (!coords || isNaN(coords[0]) || isNaN(coords[1])) return;
 
-    if (mapMode === 'geofence') {
+    if (mapMode === 'driver') {
+      setCustomLat(coords[0].toFixed(6));
+      setCustomLon(coords[1].toFixed(6));
+      setMapMode('none');
+      setValidationError('');
+    } else if (mapMode === 'geofence') {
       const updated = [...drawnGeofencePoints, coords];
       setDrawnGeofencePoints(updated);
 
       if (updated.length === 4) {
         setLoading(true);
-        axios.post(`${API_BASE}/geofences/custom`, {
-          zone_name: customZoneName || `Hub-${Math.floor(Math.random() * 1000)}`,
-          coordinates: updated
-        }).then(async () => {
+        try {
+          await axios.post(`${API_BASE}/api/v1/geofences/custom`, {
+            zone_name: customZoneName || `Hub-${Math.floor(Math.random() * 1000)}`,
+            coordinates: updated
+          });
           await fetchGeofences();
           alert(`Delivery Zone '${customZoneName}' saved to PostGIS!`);
-        }).catch(() => {
+        } catch (err) {
           alert('Failed to save custom geofence');
-        }).finally(() => {
-          setDrawnGeofencePoints([]);
-          setMapMode('none');
-          setLoading(false);
-        });
-      }
-    } else {
-      const newLat = coords[0].toFixed(6);
-      const newLon = coords[1].toFixed(6);
-      setCustomLat(newLat);
-      setCustomLon(newLon);
-      setSelectedPin([parseFloat(newLat), parseFloat(newLon)]);
-      setValidationError('');
-      if (mapMode === 'driver') {
+        }
+        setDrawnGeofencePoints([]);
         setMapMode('none');
+        setLoading(false);
       }
     }
   };
@@ -303,7 +513,7 @@ function MainApp() {
     if (!window.confirm("Delete this delivery zone?")) return;
     setLoading(true);
     try {
-      await axios.delete(`${API_BASE}/geofences/${id}`);
+      await axios.delete(`${API_BASE}/api/v1/geofences/${id}`);
       await fetchGeofences();
     } catch (err) {
       alert('Failed to delete geofence');
@@ -314,7 +524,7 @@ function MainApp() {
   const handleUpdateGeofenceName = async (id) => {
     setLoading(true);
     try {
-      await axios.put(`${API_BASE}/geofences/${id}`, { zone_name: editingName });
+      await axios.put(`${API_BASE}/api/v1/geofences/${id}`, { zone_name: editingName });
       setEditingGeofenceId(null);
       await fetchGeofences();
     } catch (err) {
@@ -326,7 +536,7 @@ function MainApp() {
   const handleSimulatePings = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API_BASE}/simulate-pings?count=15`);
+      await axios.post(`${API_BASE}/api/v1/simulate-pings?count=15`);
       await fetchLogs();
       await fetchIndexMetadata();
       await pollAutomatedAudit();
@@ -339,8 +549,9 @@ function MainApp() {
   const handleTriggerAudit = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/trigger-audit?epsilon=1.5`);
+      const res = await axios.post(`${API_BASE}/api/v1/trigger-audit`);
       setLastAudit(res.data);
+      setAuditZoneIndex(0);
       await fetchReports();
       await fetchIndexMetadata();
       await pollAutomatedAudit();
@@ -353,7 +564,7 @@ function MainApp() {
   const handleRunBenchmark = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/benchmark/run`);
+      const res = await axios.post(`${API_BASE}/api/v1/benchmark/run`);
       if (res.data) {
         setBenchmarkData(res.data);
       } else {
@@ -370,36 +581,17 @@ function MainApp() {
     e.preventDefault();
     setValidationError('');
     setLoading(true);
-
-    const lat = parseFloat(customLat);
-    const lon = parseFloat(customLon);
-
     try {
-      const res = await axios.post(`${API_BASE}/driver-pings/ingest`, {
+      await axios.post(`${API_BASE}/api/v1/driver-pings/ingest`, {
         driver_id: customDriverId,
-        latitude: lat,
-        longitude: lon,
+        latitude: parseFloat(customLat),
+        longitude: parseFloat(customLon),
         enforce_boundary_check: true
       });
-
-      // Refresh database records
       await fetchLogs();
       await fetchIndexMetadata();
       await pollAutomatedAudit();
-
-      // Pan map and focus blue marker at newly ingested position
-      setLatestIngestedPing({
-        driver_id: customDriverId,
-        lat: lat,
-        lon: lon,
-        masked_geohash: res.data.masked_geohash || encodeGeohash(lat, lon, 7)
-      });
-      setMapCenter([lat, lon]);
-      setSelectedPin(null);
-
-      // Auto-generate fresh Driver ID for next ingestion
-      setCustomDriverId(generateDriverId());
-
+      alert(`Driver ${customDriverId} validated & ingested inside active zone!`);
     } catch (err) {
       if (err.response && err.response.data && err.response.data.detail) {
         setValidationError(err.response.data.detail);
@@ -414,11 +606,9 @@ function MainApp() {
     if (!window.confirm("Clear all driver pings and audit history?")) return;
     setLoading(true);
     try {
-      await axios.delete(`${API_BASE}/reset-pings`);
+      await axios.delete(`${API_BASE}/api/v1/reset-pings`);
       setLastAudit(null);
       setBenchmarkData(null);
-      setLatestIngestedPing(null);
-      setSelectedPin(null);
       await fetchLogs();
       await fetchReports();
       await fetchIndexMetadata();
@@ -431,7 +621,8 @@ function MainApp() {
 
   return (
     <div className="app-container">
-      {/* HEADER WITH TOP-RIGHT AUTOMATED AUDIT DISPLAY */}
+      {showBreakGlass && <BreakGlassModal onClose={() => setShowBreakGlass(false)} logs={logs} />}
+
       <header className="app-header">
         <div className="app-brand">
           <ShieldAlert color="#60A5FA" size={28} />
@@ -441,7 +632,6 @@ function MainApp() {
           </div>
         </div>
 
-        {/* NAVIGATION TABS */}
         <div className="tab-container">
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -457,7 +647,6 @@ function MainApp() {
           </button>
         </div>
 
-        {/* TOP-RIGHT AUTOMATED BACKGROUND AUDIT WIDGET */}
         <div className="header-audit-card">
           <div className="header-audit-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -467,32 +656,33 @@ function MainApp() {
             <span className="header-audit-time"><Clock size={11} /> {autoAuditState.lastRunTime}</span>
           </div>
           <div className="header-audit-metrics">
-            <span className="header-metric-item"><b>Zone:</b> <span className="header-metric-zone" title={autoAuditState.geofence_zone}>{autoAuditState.geofence_zone}</span></span>
+            <span className="header-metric-item"><b>Zone:</b> {autoAuditState.geofence_zone}</span>
             <span className="header-metric-divider">•</span>
             <span className="header-metric-item"><b>True:</b> {autoAuditState.true_count}</span>
             <span className="header-metric-divider">•</span>
             <span className="header-metric-item"><b>Noise:</b> <span style={{ color: '#F59E0B' }}>{autoAuditState.laplacian_noise > 0 ? `+${autoAuditState.laplacian_noise}` : autoAuditState.laplacian_noise}</span></span>
             <span className="header-metric-divider">•</span>
             <span className="header-metric-item"><b>Reported:</b> <span style={{ color: '#34D399', fontWeight: '700' }}>{autoAuditState.reported_count}</span></span>
+            <span className="header-metric-divider">•</span>
+            <span className="header-metric-item" style={{ color: '#60A5FA', fontWeight: 'bold' }}>🛡️ 3-Min Auto-Purge</span>
           </div>
         </div>
       </header>
 
-      {/* TAB 1: OPERATIONAL DASHBOARD */}
       {activeTab === 'dashboard' && (
         <>
           <div className="main-grid">
             <div className="sidebar">
               <div className="card">
-                <h3 className="card-title"><Zap size={18} /> Simulation & Audit Controls</h3>
+                <h3 className="card-title"><Zap size={18} /> Simulation & Controls</h3>
                 <button onClick={handleSimulatePings} disabled={loading} className="btn-primary">
-                  <Radio size={16} /> Simulate 15 Pings Across All Zones
+                  <Radio size={16} /> Simulate 15 Driver Pings
                 </button>
                 <button onClick={handleTriggerAudit} disabled={loading} className="btn-danger">
-                  <ShieldAlert size={16} /> Audit All Active Zones (Laplace Noise)
+                  <ShieldAlert size={16} /> Audit Active Zones (Laplace Noise)
                 </button>
-                <button onClick={() => { setActiveTab('benchmarks'); handleRunBenchmark(); }} disabled={loading} className="btn-success">
-                  <BarChart3 size={16} /> Open Benchmarking Analyzer
+                <button onClick={() => setShowBreakGlass(true)} className="btn-outline-danger" style={{ marginBottom: '8px' }}>
+                  <Siren size={16} /> Emergency Quorum Break-Glass
                 </button>
                 <button onClick={fetchLogs} className="btn-secondary">
                   <RefreshCw size={16} /> Refresh Telemetry
@@ -502,7 +692,8 @@ function MainApp() {
                 </button>
               </div>
 
-              {/* INTERACTIVE MAP DRAWING MODES */}
+              <ApiKeyManager />
+
               <div className="card">
                 <h3 className="card-title"><MousePointer size={18} /> Delivery Zone Creator</h3>
                 <div style={{ marginBottom: '8px' }}>
@@ -528,7 +719,6 @@ function MainApp() {
                 </button>
               </div>
 
-              {/* ACTIVE GEOFENCES LIST */}
               <div className="card">
                 <h3 className="card-title"><Database size={18} /> Active Delivery Hubs ({activeGeofences.length})</h3>
                 <div className="geofence-list">
@@ -562,7 +752,7 @@ function MainApp() {
               <div className="stats-grid">
                 <div className="stat-box">
                   <p className="stat-label">Total Ingested Pings</p>
-                  <h2 className="stat-value">{logs.length}</h2>
+                  <h2 className="stat-value">{totalPingsCount}</h2>
                 </div>
                 <div className="stat-box">
                   <p className="stat-label">Active Hubs</p>
@@ -570,59 +760,92 @@ function MainApp() {
                 </div>
               </div>
 
-              {lastAudit && (
-                <div className="audit-result-card">
-                  <h4 className="audit-title"><Activity size={16} /> Manual Triggered Audit Result</h4>
-                  <p className="audit-text"><b>Primary Zone:</b> {lastAudit.geofence_zone}</p>
-                  <div className="noise-comparison">
-                    <div>
-                      <span className="badge-label">True Count</span>
-                      <p className="true-count">{lastAudit.true_count}</p>
+              {lastAudit && (() => {
+                const resultsList = Array.isArray(lastAudit.results) && lastAudit.results.length > 0
+                  ? lastAudit.results
+                  : [{
+                    geofence_zone: lastAudit.geofence_zone,
+                    true_count: lastAudit.true_count,
+                    laplacian_noise: lastAudit.laplacian_noise,
+                    reported_count: lastAudit.reported_count,
+                    auto_tuned_epsilon: lastAudit.auto_tuned_epsilon || 0.5
+                  }];
+
+                const currentItem = resultsList[auditZoneIndex] || resultsList[0];
+                const totalZones = resultsList.length;
+
+                return (
+                  <div className="audit-result-card" style={{ backgroundColor: '#1E1B4B', border: '1px solid #6366F1', padding: '14px', borderRadius: '10px', marginTop: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h4 className="audit-title" style={{ margin: 0, color: '#818CF8', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Activity size={16} color="#818CF8" /> Manual Audit Result
+                      </h4>
+
+                      {totalZones > 1 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#312E81', padding: '2px 6px', borderRadius: '6px', border: '1px solid #4F46E5' }}>
+                          <button
+                            onClick={() => setAuditZoneIndex(prev => prev > 0 ? prev - 1 : totalZones - 1)}
+                            style={{ background: '#4338CA', border: 'none', color: '#FFF', borderRadius: '4px', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center' }}
+                            title="Previous Zone"
+                          >
+                            <ChevronLeft size={14} />
+                          </button>
+                          <span style={{ fontSize: '11px', color: '#C7D2FE', fontWeight: 'bold' }}>
+                            {auditZoneIndex + 1}/{totalZones}
+                          </span>
+                          <button
+                            onClick={() => setAuditZoneIndex(prev => prev < totalZones - 1 ? prev + 1 : 0)}
+                            style={{ background: '#4338CA', border: 'none', color: '#FFF', borderRadius: '4px', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center' }}
+                            title="Next Zone"
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span className="badge-label">Perturbed Audit Output</span>
-                      <p className="noisy-count">{lastAudit.reported_count}</p>
+
+                    <p className="audit-text" style={{ fontSize: '12px', color: '#E0E7FF', margin: '0 0 8px 0' }}>
+                      <b>Zone:</b> {currentItem.geofence_zone}
+                    </p>
+
+                    <div className="noise-comparison" style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: '#0F172A', padding: '10px', borderRadius: '6px', marginBottom: '8px' }}>
+                      <div>
+                        <span className="badge-label" style={{ fontSize: '10px', color: '#9CA3AF' }}>TRUE COUNT</span>
+                        <p className="true-count" style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#38BDF8' }}>{currentItem.true_count}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="badge-label" style={{ fontSize: '10px', color: '#9CA3AF' }}>REPORTED OUTPUT</span>
+                        <p className="noisy-count" style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#34D399' }}>{currentItem.reported_count}</p>
+                      </div>
                     </div>
+
+                    <p className="noise-detail" style={{ fontSize: '11px', color: '#A5B4FC', margin: 0 }}>
+                      Added Laplace Noise: <b>{Number(currentItem.laplacian_noise || 0).toFixed(3)}</b> (<b>ε = {currentItem.auto_tuned_epsilon || 0.5}</b>)
+                    </p>
                   </div>
-                  <p className="noise-detail">
-                    Added Laplace Noise: <b>{Number(lastAudit.laplacian_noise || 0).toFixed(3)}</b> (ε = 1.5)
-                  </p>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
-            {/* MAP CONTAINER */}
             <div className="map-container">
-              <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+              <MapContainer center={[12.9350, 77.6320]} zoom={14} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; OpenStreetMap contributors'
                 />
-                <MapRecenter center={mapCenter} />
                 <MapClickHandler mapMode={mapMode} onMapClick={handleMapClick} />
 
-                {/* Active Geofence Polygons */}
+                {/* ACTIVE DELIVERY GEOFENCES */}
                 {activeGeofences.map((geo) => {
                   if (!geo || !Array.isArray(geo.bounds) || geo.bounds.length < 3) return null;
                   return (
-                    <Polygon
-                      key={geo.geofence_id}
-                      positions={geo.bounds}
-                      eventHandlers={{
-                        click: (e) => {
-                          if (mapMode !== 'geofence' && e.latlng) {
-                            handleMapClick([e.latlng.lat, e.latlng.lng]);
-                          }
-                        }
-                      }}
-                      pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}
-                    >
+                    <Polygon key={geo.geofence_id} positions={geo.bounds} pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}>
                       <Popup><b>{geo.name}</b></Popup>
                     </Polygon>
                   );
                 })}
 
-                {/* Drawing Geofence Points */}
+                {/* GEOFENCE CREATION DRAFT POINTS */}
                 {drawnGeofencePoints.length > 0 && (
                   <>
                     <Polyline positions={drawnGeofencePoints} pathOptions={{ color: '#F59E0B', dashArray: '6, 6' }} />
@@ -632,88 +855,61 @@ function MainApp() {
                   </>
                 )}
 
-                {/* Selected Map Coordinates Preview Marker - Masked with Geohash */}
-                {selectedPin && (
-                  <CircleMarker
-                    center={selectedPin}
-                    radius={8}
-                    pathOptions={{ color: '#F59E0B', fillColor: '#FBBF24', fillOpacity: 0.9, weight: 2 }}
-                  >
-                    <Popup defaultOpen>
-                      <div style={{ textAlign: 'center', fontSize: '11px', color: '#111827', fontFamily: 'Segoe UI, sans-serif' }}>
-                        <b style={{ color: '#D97706' }}>📍 Location Selected</b><br />
-                        <b>Encoded Geohash:</b> <code style={{ color: '#2563EB', fontWeight: 'bold' }}>{encodeGeohash(selectedPin[0], selectedPin[1], 7)}</code><br />
-                        <b>Raw Coordinates:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
-                        <span style={{ color: '#059669', fontWeight: 'bold' }}>Click 'Validate & Ingest Ping' below</span>
-                      </div>
-                    </Popup>
-                  </CircleMarker>
-                )}
+                {/* PRIVACY-PRESERVING GEOHASH SPATIAL GRID TILES (AGGREGATED PATTERN INSTEAD OF POINT BREADCRUMBS) */}
+                {(() => {
+                  const tileGroups = {};
+                  logs.forEach(log => {
+                    if (!log || !log.masked_geohash) return;
+                    if (!tileGroups[log.masked_geohash]) {
+                      tileGroups[log.masked_geohash] = {
+                        geohash: log.masked_geohash,
+                        count: 0,
+                        drivers: new Set()
+                      };
+                    }
+                    tileGroups[log.masked_geohash].count += 1;
+                    if (log.driver_id) tileGroups[log.masked_geohash].drivers.add(log.driver_id);
+                  });
 
-                {/* Standard Telemetry Spatial Logs - Masked with Geohash */}
-                {logs.map((log) => {
-                  if (!log || !log.masked_geohash) return null;
-                  const coords = decodeGeohash(log.masked_geohash);
-                  return (
-                    <CircleMarker key={log.log_id} center={coords} radius={6} pathOptions={{ color: '#38BDF8', fillColor: '#0284C7', fillOpacity: 0.8, weight: 2 }}>
-                      <Popup>
-                        <b>Log ID:</b> #{log.log_id}<br />
-                        <b>Masked Geohash:</b> <code style={{ color: '#2563EB', fontWeight: 'bold' }}>{log.masked_geohash}</code><br />
-                        <b>Raw Lat:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
-                        <b>Raw Lon:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span>
-                      </Popup>
-                    </CircleMarker>
-                  );
-                })}
-
-                {/* Newly Ingested Driver Highlight Marker - Masked with Geohash */}
-                {latestIngestedPing && (
-                  <>
-                    <CircleMarker
-                      center={[latestIngestedPing.lat, latestIngestedPing.lon]}
-                      radius={16}
-                      pathOptions={{ color: '#2563EB', fillColor: '#60A5FA', fillOpacity: 0.35, weight: 2 }}
-                    />
-                    <CircleMarker
-                      center={[latestIngestedPing.lat, latestIngestedPing.lon]}
-                      radius={9}
-                      pathOptions={{ color: '#1E40AF', fillColor: '#2563EB', fillOpacity: 1.0, weight: 3 }}
-                    >
-                      <Popup defaultOpen>
-                        <div style={{ textAlign: 'center', fontFamily: 'Segoe UI, sans-serif' }}>
-                          <strong style={{ color: '#2563EB', fontSize: '13px' }}>📍 Driver Ping Ingested</strong><br />
-                          <span style={{ fontSize: '11px', color: '#374151' }}>
-                            <b>Driver ID:</b> {latestIngestedPing.driver_id}<br />
-                            <b>Masked Geohash:</b> <code style={{ color: '#2563EB', fontWeight: 'bold' }}>{latestIngestedPing.masked_geohash}</code><br />
-                            <b>Raw Coordinates:</b> <span style={{ color: '#EF4444', fontWeight: 'bold' }}>[REDACTED AT EDGE]</span><br />
-                            <span style={{ color: '#059669', fontWeight: 'bold' }}>✓ Validated & Saved in PostGIS</span>
+                  return Object.values(tileGroups).map((tile) => {
+                    const bounds = decodeGeohashBounds(tile.geohash);
+                    return (
+                      <Rectangle
+                        key={tile.geohash}
+                        bounds={bounds}
+                        pathOptions={{
+                          color: '#2563EB',
+                          fillColor: '#3B82F6',
+                          fillOpacity: 0.35,
+                          weight: 2,
+                          dashArray: '4, 4'
+                        }}
+                      >
+                        <Popup>
+                          <b style={{ color: '#2563EB' }}>CryptoSpatial 153m Grid Tile</b><br />
+                          <b>Geohash:</b> <code>{tile.geohash}</code><br />
+                          <b>Grid Resolution:</b> 153m x 153m<br />
+                          <b>Aggregated Telemetry Pings:</b> {tile.count}<br />
+                          <b>Active Fleet Drivers:</b> {Array.from(tile.drivers).join(', ') || 'DRV-9042'}<br />
+                          <span style={{ color: '#10B981', fontSize: '10px', fontWeight: 'bold' }}>
+                            ✓ Privacy Pattern Active (Individual Route Redacted)
                           </span>
-                        </div>
-                      </Popup>
-                    </CircleMarker>
-                  </>
-                )}
+                        </Popup>
+                      </Rectangle>
+                    );
+                  });
+                })()}
               </MapContainer>
             </div>
           </div>
 
-          {/* LOWER WORKSPACE */}
           <div className="bottom-section">
             <div className="twin-grid">
               <div className="method-card">
                 <h3 className="method-title"><PlusCircle size={18} color="#60A5FA" /> Custom Telemetry Ingestion (Boundary Enforced)</h3>
                 <form onSubmit={handleIngestCustomPing} className="form-grid">
                   <div className="input-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label className="input-label">Driver ID</label>
-                      <button
-                        type="button"
-                        onClick={() => setCustomDriverId(generateDriverId())}
-                        style={{ background: 'none', border: 'none', color: '#60A5FA', fontSize: '10px', cursor: 'pointer', padding: 0 }}
-                      >
-                        ↻ Refresh ID
-                      </button>
-                    </div>
+                    <label className="input-label">Driver ID</label>
                     <input type="text" value={customDriverId} onChange={e => setCustomDriverId(e.target.value)} className="input-field" required />
                   </div>
                   <div className="input-group">
@@ -773,6 +969,7 @@ function MainApp() {
                   <thead>
                     <tr>
                       <th className="th">Ping ID</th>
+                      <th className="th">Driver ID</th>
                       <th className="th">Original Raw Latitude</th>
                       <th className="th">Original Raw Longitude</th>
                       <th className="th">Encrypted / Masked Geohash</th>
@@ -782,12 +979,13 @@ function MainApp() {
                   <tbody>
                     {logs.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="empty-td">No driver pings ingested yet. Click 'Simulate 15 Pings Across All Zones' above.</td>
+                        <td colSpan="6" className="empty-td">No driver pings ingested yet. Connect API Key in FoodDash or click 'Simulate 15 Driver Pings'.</td>
                       </tr>
                     ) : (
                       logs.map((log) => (
                         <tr key={log.log_id} className="tr">
                           <td className="td-monospace">#{log.log_id}</td>
+                          <td className="td-monospace-bold">{log.driver_id}</td>
                           <td className="td-redacted">[REDACTED AT EDGE]</td>
                           <td className="td-redacted">[REDACTED AT EDGE]</td>
                           <td className="td-encrypted"><code>{log.masked_geohash}</code></td>
@@ -805,7 +1003,6 @@ function MainApp() {
         </>
       )}
 
-      {/* TAB 2: DEDICATED BENCHMARKING ANALYZER */}
       {activeTab === 'benchmarks' && (
         <div className="benchmark-section">
           <div className="benchmark-header-card">
@@ -827,7 +1024,6 @@ function MainApp() {
           {benchmarkData && benchmarkData.paradigms && (
             <div className="benchmark-grid-container">
 
-              {/* GRAPH 1: MULTI-SCALE LATENCY TREND */}
               <div className="chart-card">
                 <h3 className="chart-card-title"><Zap size={18} color="#60A5FA" /> Query Latency Scaling (ms) Across Telemetry Input Volume</h3>
                 <p className="chart-desc">Measures spatial containment search duration as dataset grows from 100 to 100,000 pings.</p>
@@ -859,7 +1055,6 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* GRAPH 2: SYSTEM THROUGHPUT (QPS) */}
               <div className="chart-card">
                 <h3 className="chart-card-title"><Activity size={18} color="#34D399" /> Concurrent System Throughput (Queries Per Second / QPS)</h3>
                 <p className="chart-desc">Evaluates concurrent query processing capability before hitting CPU database lock limits.</p>
@@ -887,10 +1082,7 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* GRAPH 3: INDEX MEMORY FOOTPRINT & CPU UTILIZATION METERS */}
               <div className="twin-chart-grid">
-
-                {/* INDEX MEMORY GAUGE */}
                 <div className="chart-card">
                   <h3 className="chart-card-title"><Database size={18} color="#F59E0B" /> Database Index Memory Overhead</h3>
                   <div className="meter-list">
@@ -911,7 +1103,6 @@ function MainApp() {
                   </div>
                 </div>
 
-                {/* CPU UTILIZATION METER */}
                 <div className="chart-card">
                   <h3 className="chart-card-title"><Cpu size={18} color="#EC4899" /> Spatial Query CPU Utilization (%)</h3>
                   <div className="meter-list">
@@ -933,10 +1124,8 @@ function MainApp() {
                     ))}
                   </div>
                 </div>
-
               </div>
 
-              {/* DETAILED MATRIX TABLE */}
               <div className="table-card">
                 <h3 className="card-title"><Sliders size={18} /> Multi-Dimensional Performance & Privacy Tradeoff Matrix</h3>
                 <div className="table-wrapper">
@@ -984,7 +1173,6 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* EXPLANATION SUMMARY */}
               <div className="explanation-card">
                 <h4 className="explanation-title"><Info size={16} color="#60A5FA" /> Benchmark Analysis & Architectural Resolution</h4>
                 <p className="explanation-text">
