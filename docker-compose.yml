@@ -56,5 +56,16 @@ services:
     depends_on:
       - backend
 
+  db-inspector:
+    build:
+      context: ./db-inspector
+      dockerfile: Dockerfile
+    container_name: cryptospatial_db_inspector
+    restart: always
+    ports:
+      - "5175:5175"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:

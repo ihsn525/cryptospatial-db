@@ -39,7 +39,7 @@ async def get_db():
         yield session
 
 # -----------------------------------------------------------------------------
-# HARDENED DATABASE MODELS
+# HARDENED DATABASE MODELS (PRIMARY OPERATIONAL & SECONDARY COLD VAULT)
 # -----------------------------------------------------------------------------
 class SpatialLogModel(Base):
     __tablename__ = "spatial_logs"
@@ -48,7 +48,7 @@ class SpatialLogModel(Base):
     raw_lat = Column(Float, nullable=True)
     raw_lon = Column(Float, nullable=True)
     masked_geohash = Column(String(12), nullable=False)
-    recorded_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class GeofenceModel(Base):
     __tablename__ = "geofences"
@@ -63,16 +63,54 @@ class AuditReportModel(Base):
     true_count = Column(Integer, nullable=False)
     laplacian_noise = Column(Float, nullable=False)
     reported_count = Column(Integer, nullable=False)
-    generated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class ApiKeyModel(Base):
     __tablename__ = "api_keys"
     key_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_name = Column(String(100), nullable=False)
-    api_key_hash = Column(String(64), unique=True, nullable=False, index=True)  # SHA-256 HASH ONLY
-    key_prefix = Column(String(20), nullable=False)                            # Masked string: cs_live_9f8a...3b4c
+    api_key_hash = Column(String(64), unique=True, nullable=False, index=True)
+    key_prefix = Column(String(20), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# SECONDARY COLD STORAGE ARCHIVE MODELS
+class ArchivedSpatialLogModel(Base):
+    __tablename__ = "archived_spatial_logs"
+    archive_id = Column(BigInteger, primary_key=True, index=True)
+    log_id = Column(BigInteger, nullable=False)
+    driver_id = Column(String(50), nullable=True)
+    masked_geohash = Column(String(12), nullable=False)
+    recorded_at = Column(DateTime(timezone=True))
+    archived_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ArchivedAuditReportModel(Base):
+    __tablename__ = "archived_audit_reports"
+    archive_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_id = Column(UUID(as_uuid=True), nullable=False)
+    geofence_id = Column(UUID(as_uuid=True), nullable=False)
+    true_count = Column(Integer, nullable=False)
+    laplacian_noise = Column(Float, nullable=False)
+    reported_count = Column(Integer, nullable=False)
+    generated_at = Column(DateTime(timezone=True))
+    archived_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# -----------------------------------------------------------------------------
+# REAL-TIME MUTATION LOGGING BUFFER
+# -----------------------------------------------------------------------------
+RECENT_SQL_MUTATIONS = []
+
+def record_sql_mutation(query_type: str, table: str, statement: str):
+    mutation = {
+        "id": str(uuid.uuid4())[:8],
+        "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3],
+        "query_type": query_type,
+        "table": table,
+        "statement": statement
+    }
+    RECENT_SQL_MUTATIONS.insert(0, mutation)
+    if len(RECENT_SQL_MUTATIONS) > 40:
+        RECENT_SQL_MUTATIONS.pop()
 
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -122,7 +160,7 @@ def decode_geohash(geohash: str) -> List[float]:
         if cd == -1:
             continue
         for j in range(4, -1, -1):
-            mask = 1 << j;
+            mask = 1 << j
             if is_even:
                 mid = (lon_interval[0] + lon_interval[1]) / 2
                 if (cd & mask) != 0:
@@ -221,29 +259,64 @@ class ApiKeyGenerateResponse(BaseModel):
     warning: str
 
 # -----------------------------------------------------------------------------
-# BACKGROUND WORKERS (EPHEMERAL PURGE & AUTO AUDIT)
+# BACKGROUND WORKERS (EPHEMERAL PURGE WITH SERVER TIME & AUTO AUDIT)
 # -----------------------------------------------------------------------------
 auto_audit_enabled = True
 
-async def auto_purge_ephemeral_pings():
+async def auto_purge_ephemeral_data():
     """
-    Deletes telemetry pings older than 3 minutes (180s) from PostGIS to enforce
-    Zero-Trust Ephemeral Data Retention.
+    Moves expired location pings and audit reports (>90s old) into 
+    secondary cold storage tables using PostgreSQL server time to avoid clock skew.
     """
     while True:
         try:
-            await asyncio.sleep(30)
+            await asyncio.sleep(10)
             async with AsyncSessionLocal() as db:
-                cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=3)
-                stmt = delete(SpatialLogModel).where(SpatialLogModel.recorded_at < cutoff_time)
-                res = await db.execute(stmt)
+                # A. Move expired location pings to Secondary Cold Storage
+                arch_pings_sql = text("""
+                    INSERT INTO archived_spatial_logs (log_id, driver_id, masked_geohash, recorded_at, archived_at)
+                    SELECT log_id, driver_id, masked_geohash, recorded_at, NOW()
+                    FROM spatial_logs
+                    WHERE recorded_at < (NOW() - INTERVAL '90 seconds');
+                """)
+                await db.execute(arch_pings_sql)
+                
+                # Delete expired pings from primary table
+                del_pings_sql = text("""
+                    DELETE FROM spatial_logs 
+                    WHERE recorded_at < (NOW() - INTERVAL '90 seconds');
+                """)
+                res_logs = await db.execute(del_pings_sql)
+                
+                # B. Move expired audit reports to Secondary Cold Storage
+                arch_audits_sql = text("""
+                    INSERT INTO archived_audit_reports (report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at, archived_at)
+                    SELECT report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at, NOW()
+                    FROM audit_reports
+                    WHERE generated_at < (NOW() - INTERVAL '90 seconds');
+                """)
+                await db.execute(arch_audits_sql)
+                
+                # Delete expired audit reports from primary table
+                del_audits_sql = text("""
+                    DELETE FROM audit_reports 
+                    WHERE generated_at < (NOW() - INTERVAL '90 seconds');
+                """)
+                res_audits = await db.execute(del_audits_sql)
+                
                 await db.commit()
-                if res.rowcount > 0:
-                    print(f"🧹 [Ephemeral Shield] Auto-purged {res.rowcount} telemetry pings (>3 mins old).")
+                
+                if res_logs.rowcount > 0:
+                    record_sql_mutation("DELETE", "spatial_logs", f"DELETE FROM spatial_logs (Archived {res_logs.rowcount} rows to archived_spatial_logs)")
+                if res_audits.rowcount > 0:
+                    record_sql_mutation("DELETE", "audit_reports", f"DELETE FROM audit_reports (Archived {res_audits.rowcount} rows to archived_audit_reports)")
+
+                if res_logs.rowcount > 0 or res_audits.rowcount > 0:
+                    print(f"📦 [Cold Storage Vault] Archived {res_logs.rowcount} pings & {res_audits.rowcount} audit reports to secondary storage.")
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"⚠️ Ephemeral purge task error: {e}")
+            print(f"⚠️ Secondary storage archive error: {e}")
 
 async def background_audit_worker():
     await asyncio.sleep(4)
@@ -258,13 +331,14 @@ async def background_audit_worker():
                             SELECT COUNT(*) FROM spatial_logs l
                             WHERE ST_Contains(
                                 (SELECT boundary_polygon FROM geofences WHERE geofence_id = CAST(:g_id AS uuid)),
-                                ST_SetSRID(ST_PointFromGeoHash(l.masked_geohash), 4326)
+                                l.geom
                             );
                         """), {"g_id": str(gf.geofence_id)})
                         true_count = cnt_res.scalar() or 0
                         effective_eps = 0.5 if true_count < 5 else 2.0
                         proc_sql = text("CALL sp_generate_privacy_audit(CAST(:g_id AS uuid), :eps)")
                         await db.execute(proc_sql, {"g_id": str(gf.geofence_id), "eps": effective_eps})
+                        record_sql_mutation("PROCEDURE", "audit_reports", f"CALL sp_generate_privacy_audit('{gf.geofence_id}', eps={effective_eps})")
                     await db.commit()
                 except Exception:
                     await db.rollback()
@@ -275,24 +349,33 @@ async def background_audit_worker():
 # -----------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create tables & launch workers
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    purge_task = asyncio.create_task(auto_purge_ephemeral_pings())
+        
+        await conn.execute(text("""
+            ALTER TABLE spatial_logs 
+            ADD COLUMN IF NOT EXISTS geom GEOMETRY(Point, 4326) 
+            GENERATED ALWAYS AS (ST_SetSRID(ST_PointFromGeoHash(masked_geohash), 4326)) STORED;
+        """))
+        
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_spatial_logs_geom_gist 
+            ON spatial_logs USING GIST (geom);
+        """))
+
+    purge_task = asyncio.create_task(auto_purge_ephemeral_data())
     audit_task = asyncio.create_task(background_audit_worker())
-    print("🚀 CryptoSpatial Engine initialized with 3-Minute Ephemeral Data Retention Policy.")
+    print("🚀 CryptoSpatial Engine initialized with GiST R-Tree Indexing & Secondary Cold Storage Vault.")
     
     yield
     
-    # Shutdown
     purge_task.cancel()
     audit_task.cancel()
 
 app = FastAPI(
     title="CryptoSpatial-DB Engine - DBTHON Edition",
     version="2.0.0",
-    description="Privacy-Preserving Geospatial Database Middleware with Dynamic Differential Privacy & Quorum Break-Glass",
+    description="Privacy-Preserving Geospatial Database Middleware with Dynamic Differential Privacy, Quorum Break-Glass, and Cold Storage Vault",
     lifespan=lifespan
 )
 
@@ -308,7 +391,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def verify_api_key(key: str = Depends(api_key_header), db: AsyncSession = Depends(get_db)):
     if not key:
-        return True  # Fallback for direct dashboard simulation UI
+        return True
     
     key_hash = hash_api_key(key)
     stmt = select(ApiKeyModel).where(ApiKeyModel.api_key_hash == key_hash, ApiKeyModel.is_active == True)
@@ -331,6 +414,155 @@ def verify_admin_passkey(x_admin_passkey: Optional[str] = Header(None)):
     return True
 
 # -----------------------------------------------------------------------------
+# ADMIN SECONDARY COLD STORAGE ENDPOINT
+# -----------------------------------------------------------------------------
+@app.get("/api/v1/admin/archives", tags=["Admin Secondary Storage Vault"])
+async def get_archived_vault_data(
+    db: AsyncSession = Depends(get_db),
+    admin_auth: bool = Depends(verify_admin_passkey)
+):
+    logs_res = await db.execute(
+        select(ArchivedSpatialLogModel).order_by(ArchivedSpatialLogModel.archived_at.desc()).limit(100)
+    )
+    archived_logs = logs_res.scalars().all()
+
+    audits_res = await db.execute(
+        select(ArchivedAuditReportModel).order_by(ArchivedAuditReportModel.archived_at.desc()).limit(100)
+    )
+    archived_audits = audits_res.scalars().all()
+
+    return {
+        "status": "success",
+        "total_archived_pings": len(archived_logs),
+        "total_archived_audits": len(archived_audits),
+        "archived_pings": [
+            {
+                "archive_id": a.archive_id,
+                "log_id": a.log_id,
+                "driver_id": a.driver_id,
+                "masked_geohash": a.masked_geohash,
+                "recorded_at": str(a.recorded_at),
+                "archived_at": str(a.archived_at)
+            } for a in archived_logs
+        ],
+        "archived_audits": [
+            {
+                "archive_id": str(a.archive_id),
+                "report_id": str(a.report_id),
+                "geofence_id": str(a.geofence_id),
+                "true_count": a.true_count,
+                "laplacian_noise": round(a.laplacian_noise, 3),
+                "reported_count": a.reported_count,
+                "generated_at": str(a.generated_at),
+                "archived_at": str(a.archived_at)
+            } for a in archived_audits
+        ]
+    }
+
+# -----------------------------------------------------------------------------
+# INSPECTOR API ROUTER (`/api/v1/inspector`)
+# -----------------------------------------------------------------------------
+inspector_router = APIRouter(prefix="/api/v1/inspector", tags=["PostGIS Database Inspector"])
+
+@inspector_router.get("/sql-mutations")
+async def get_live_sql_mutations():
+    return {"status": "success", "data": RECENT_SQL_MUTATIONS}
+
+@inspector_router.get("/live-tables")
+async def get_live_table_data(db: AsyncSession = Depends(get_db)):
+    logs_res = await db.execute(select(SpatialLogModel).order_by(SpatialLogModel.log_id.desc()).limit(5))
+    logs = logs_res.scalars().all()
+    logs_cnt = (await db.execute(text("SELECT COUNT(*) FROM spatial_logs;"))).scalar() or 0
+
+    geo_res = await db.execute(select(GeofenceModel).order_by(GeofenceModel.zone_name.asc()).limit(5))
+    geofences = geo_res.scalars().all()
+    geo_cnt = (await db.execute(text("SELECT COUNT(*) FROM geofences;"))).scalar() or 0
+
+    audit_res = await db.execute(select(AuditReportModel).order_by(AuditReportModel.generated_at.desc()).limit(5))
+    audits = audit_res.scalars().all()
+    audit_cnt = (await db.execute(text("SELECT COUNT(*) FROM audit_reports;"))).scalar() or 0
+
+    keys_res = await db.execute(select(ApiKeyModel).order_by(ApiKeyModel.created_at.desc()).limit(5))
+    keys = keys_res.scalars().all()
+    keys_cnt = (await db.execute(text("SELECT COUNT(*) FROM api_keys;"))).scalar() or 0
+
+    return {
+        "spatial_logs": {
+            "total_rows": logs_cnt,
+            "rows": [{"log_id": l.log_id, "driver_id": l.driver_id, "masked_geohash": l.masked_geohash, "recorded_at": str(l.recorded_at)} for l in logs]
+        },
+        "geofences": {
+            "total_rows": geo_cnt,
+            "rows": [{"geofence_id": str(g.geofence_id), "zone_name": g.zone_name, "is_active": g.is_active} for g in geofences]
+        },
+        "audit_reports": {
+            "total_rows": audit_cnt,
+            "rows": [{"report_id": str(a.report_id), "geofence_id": str(a.geofence_id), "true_count": a.true_count, "laplacian_noise": round(a.laplacian_noise, 3), "reported_count": a.reported_count} for a in audits]
+        },
+        "api_keys": {
+            "total_rows": keys_cnt,
+            "rows": [{"key_id": str(k.key_id), "client_name": k.client_name, "key_prefix": k.key_prefix, "is_active": k.is_active} for k in keys]
+        }
+    }
+
+@inspector_router.get("/erd-schema")
+async def get_erd_schema():
+    return {
+        "database_name": "cryptospatial_db",
+        "engine": "PostgreSQL 16 + PostGIS 3.4",
+        "tables": [
+            {
+                "table_name": "spatial_logs",
+                "description": "Ingested driver telemetry grid tiles",
+                "columns": [
+                    {"name": "log_id", "type": "BIGINT", "is_pk": True, "is_fk": False},
+                    {"name": "driver_id", "type": "VARCHAR(50)", "is_pk": False, "is_fk": False},
+                    {"name": "raw_lat", "type": "FLOAT (PURGED)", "is_pk": False, "is_fk": False},
+                    {"name": "raw_lon", "type": "FLOAT (PURGED)", "is_pk": False, "is_fk": False},
+                    {"name": "masked_geohash", "type": "VARCHAR(12)", "is_pk": False, "is_fk": False},
+                    {"name": "recorded_at", "type": "TIMESTAMPTZ", "is_pk": False, "is_fk": False}
+                ]
+            },
+            {
+                "table_name": "geofences",
+                "description": "Spatial polygons for delivery zones",
+                "columns": [
+                    {"name": "geofence_id", "type": "UUID", "is_pk": True, "is_fk": False},
+                    {"name": "zone_name", "type": "VARCHAR(100)", "is_pk": False, "is_fk": False},
+                    {"name": "boundary_polygon", "type": "GEOMETRY(POLYGON, 4326)", "is_pk": False, "is_fk": False},
+                    {"name": "is_active", "type": "BOOLEAN", "is_pk": False, "is_fk": False}
+                ]
+            },
+            {
+                "table_name": "audit_reports",
+                "description": "Differential privacy audit log history",
+                "columns": [
+                    {"name": "report_id", "type": "UUID", "is_pk": True, "is_fk": False},
+                    {"name": "geofence_id", "type": "UUID", "is_pk": False, "is_fk": True},
+                    {"name": "true_count", "type": "INTEGER", "is_pk": False, "is_fk": False},
+                    {"name": "laplacian_noise", "type": "FLOAT", "is_pk": False, "is_fk": False},
+                    {"name": "reported_count", "type": "INTEGER", "is_pk": False, "is_fk": False},
+                    {"name": "generated_at", "type": "TIMESTAMPTZ", "is_pk": False, "is_fk": False}
+                ]
+            },
+            {
+                "table_name": "api_keys",
+                "description": "Hashed middleware integration keys",
+                "columns": [
+                    {"name": "key_id", "type": "UUID", "is_pk": True, "is_fk": False},
+                    {"name": "client_name", "type": "VARCHAR(100)", "is_pk": False, "is_fk": False},
+                    {"name": "api_key_hash", "type": "VARCHAR(64)", "is_pk": False, "is_fk": False},
+                    {"name": "key_prefix", "type": "VARCHAR(20)", "is_pk": False, "is_fk": False},
+                    {"name": "is_active", "type": "BOOLEAN", "is_pk": False, "is_fk": False},
+                    {"name": "created_at", "type": "TIMESTAMPTZ", "is_pk": False, "is_fk": False}
+                ]
+            }
+        ]
+    }
+
+app.include_router(inspector_router)
+
+# -----------------------------------------------------------------------------
 # SDK MIDDLEWARE ROUTER (`/v1/sdk`)
 # -----------------------------------------------------------------------------
 sdk_router = APIRouter(prefix="/v1/sdk", tags=["CryptoSpatial SDK & Middleware"])
@@ -348,6 +580,8 @@ async def generate_api_key(payload: ApiKeyGenerateRequest, db: AsyncSession = De
     )
     db.add(new_key)
     await db.commit()
+
+    record_sql_mutation("INSERT", "api_keys", f"INSERT INTO api_keys (client_name, key_prefix) VALUES ('{payload.client_name}', '{masked_prefix}')")
 
     return ApiKeyGenerateResponse(
         status="success",
@@ -384,7 +618,7 @@ async def delete_api_key(
     except ValueError:
         raise HTTPException(
             status_code=400, 
-            detail=f"Invalid UUID format: '{key_id}'. Pass the database 'key_id' UUID, not the raw 'cs_live_...' string."
+            detail=f"Invalid UUID format: '{key_id}'."
         )
 
     stmt = text("DELETE FROM api_keys WHERE key_id = :id;")
@@ -393,6 +627,8 @@ async def delete_api_key(
 
     if res.rowcount == 0:
         raise HTTPException(status_code=404, detail=f"API Key with ID '{key_id}' not found.")
+
+    record_sql_mutation("DELETE", "api_keys", f"DELETE FROM api_keys WHERE key_id = '{key_id}'")
 
     return {"status": "success", "message": f"API Key {key_id} deleted successfully."}
 
@@ -407,6 +643,9 @@ async def mask_telemetry(payload: TelemetryMaskRequest, db: AsyncSession = Depen
     )
     db.add(ping)
     await db.commit()
+
+    record_sql_mutation("INSERT", "spatial_logs", f"INSERT INTO spatial_logs (driver_id, masked_geohash) VALUES ('{payload.driver_id}', '{masked_hash}')")
+
     return TelemetryMaskResponse(
         status="success",
         masked_geohash=masked_hash,
@@ -430,6 +669,8 @@ async def verify_proof_of_presence(payload: ProofOfPresenceRequest, db: AsyncSes
     is_inside = bool(row.is_inside)
     proof_token = generate_zk_proof_token(payload.driver_id, payload.geofence_id) if is_inside else "invalid_proof"
 
+    record_sql_mutation("SELECT", "geofences", f"SELECT ST_Contains(boundary_polygon, ST_PointFromGeoHash('{payload.masked_geohash}')) FROM geofences")
+
     return ProofOfPresenceResponse(
         is_inside_zone=is_inside,
         geofence_name=row.zone_name,
@@ -442,7 +683,7 @@ async def get_privacy_count(geofence_id: str, db: AsyncSession = Depends(get_db)
         SELECT COUNT(*) FROM spatial_logs l
         WHERE ST_Contains(
             (SELECT boundary_polygon FROM geofences WHERE geofence_id = CAST(:g_id AS uuid)),
-            ST_SetSRID(ST_PointFromGeoHash(l.masked_geohash), 4326)
+            l.geom
         );
     """), {"g_id": geofence_id})
     true_count = cnt_res.scalar() or 0
@@ -453,6 +694,8 @@ async def get_privacy_count(geofence_id: str, db: AsyncSession = Depends(get_db)
     proc_query = text("CALL sp_generate_privacy_audit(CAST(:g_id AS uuid), :eps)")
     await db.execute(proc_query, {"g_id": geofence_id, "eps": effective_eps})
     await db.commit()
+
+    record_sql_mutation("PROCEDURE", "audit_reports", f"CALL sp_generate_privacy_audit('{geofence_id}', eps={effective_eps})")
 
     report_query = text("""
         SELECT g.zone_name, r.reported_count
@@ -501,6 +744,7 @@ async def emergency_break_glass_unmask(payload: BreakGlassRequest, db: AsyncSess
         raise HTTPException(status_code=404, detail=f"No telemetry logs found for Driver ID '{payload.driver_id}'")
 
     coords = decode_geohash(log.masked_geohash)
+    record_sql_mutation("SELECT", "spatial_logs", f"SELECT masked_geohash FROM spatial_logs WHERE driver_id = '{payload.driver_id}' (Quorum Unmasked)")
 
     return BreakGlassResponse(
         status="emergency_unmasked",
@@ -518,7 +762,7 @@ app.include_router(sdk_router)
 # -----------------------------------------------------------------------------
 @app.get("/")
 async def root():
-    return {"status": "online", "system": "CryptoSpatial-DB Engine", "sdk": "/v1/sdk"}
+    return {"status": "online", "system": "CryptoSpatial-DB Engine", "sdk": "/v1/sdk", "inspector": "/api/v1/inspector"}
 
 @app.get("/api/v1/audit/latest")
 async def get_latest_audit_status(db: AsyncSession = Depends(get_db)):
@@ -540,7 +784,7 @@ async def get_latest_audit_status(db: AsyncSession = Depends(get_db)):
         "true_count": row.true_count,
         "laplacian_noise": round(float(row.laplacian_noise), 3),
         "reported_count": row.reported_count,
-        "generated_at": row.generated_at.strftime("%H:%M:%S IST")
+        "generated_at": row.generated_at.strftime("%H:%M:%S IST") if row.generated_at else "Just Now"
     }
 
 @app.get("/api/v1/geofences")
@@ -586,6 +830,7 @@ async def update_geofence(geofence_id: str, payload: UpdateGeofenceInput, db: As
     sql = text("UPDATE geofences SET zone_name = :name WHERE geofence_id = CAST(:id AS uuid);")
     await db.execute(sql, {"id": geofence_id, "name": payload.zone_name})
     await db.commit()
+    record_sql_mutation("UPDATE", "geofences", f"UPDATE geofences SET zone_name = '{payload.zone_name}' WHERE geofence_id = '{geofence_id}'")
     return {"status": "success", "message": "Delivery zone name updated"}
 
 @app.delete("/api/v1/geofences/{geofence_id}")
@@ -593,6 +838,7 @@ async def delete_geofence(geofence_id: str, db: AsyncSession = Depends(get_db)):
     sql = text("DELETE FROM geofences WHERE geofence_id = CAST(:id AS uuid);")
     await db.execute(sql, {"id": geofence_id})
     await db.commit()
+    record_sql_mutation("DELETE", "geofences", f"DELETE FROM geofences WHERE geofence_id = '{geofence_id}'")
     return {"status": "success", "message": "Delivery zone deleted"}
 
 @app.post("/api/v1/geofences/custom")
@@ -611,6 +857,7 @@ async def create_custom_geofence(payload: DynamicGeofenceInput, db: AsyncSession
     """)
     await db.execute(sql, {"id": gf_id, "name": payload.zone_name, "wkt": wkt_polygon})
     await db.commit()
+    record_sql_mutation("INSERT", "geofences", f"INSERT INTO geofences (zone_name, boundary_polygon) VALUES ('{payload.zone_name}', ST_GeomFromText('{wkt_polygon}'))")
     return {"status": "success", "geofence_id": gf_id, "zone_name": payload.zone_name}
 
 @app.post("/api/v1/simulate-pings")
@@ -637,8 +884,9 @@ async def simulate_driver_pings(count: int = 15, db: AsyncSession = Depends(get_
         lat = round(lat_base + random.uniform(-0.003, 0.003), 6)
         lon = round(lon_base + random.uniform(-0.003, 0.003), 6)
         ghash = encode_geohash(lat, lon, precision=7)
+        d_id = f"DRV-{random.randint(100, 999)}"
         ping = SpatialLogModel(
-            driver_id=f"DRV-{random.randint(100, 999)}", 
+            driver_id=d_id, 
             raw_lat=None, 
             raw_lon=None, 
             masked_geohash=ghash
@@ -646,6 +894,7 @@ async def simulate_driver_pings(count: int = 15, db: AsyncSession = Depends(get_
         db.add(ping)
         new_pings.append({"geohash": ghash})
     await db.commit()
+    record_sql_mutation("INSERT", "spatial_logs", f"INSERT INTO spatial_logs (driver_id, masked_geohash) VALUES Batch({count} Simulated Driver Pings)")
     return {"status": "success", "generated_pings": len(new_pings), "pings": new_pings}
 
 @app.post("/api/v1/trigger-audit")
@@ -662,7 +911,7 @@ async def trigger_privacy_audit(db: AsyncSession = Depends(get_db)):
             SELECT COUNT(*) FROM spatial_logs l
             WHERE ST_Contains(
                 (SELECT boundary_polygon FROM geofences WHERE geofence_id = CAST(:g_id AS uuid)),
-                ST_SetSRID(ST_PointFromGeoHash(l.masked_geohash), 4326)
+                l.geom
             );
         """), {"g_id": str(gf.geofence_id)})
         true_count = cnt_res.scalar() or 0
@@ -687,7 +936,8 @@ async def trigger_privacy_audit(db: AsyncSession = Depends(get_db)):
                 "auto_tuned_epsilon": effective_eps,
                 "density_risk_level": risk_level
             })
-    
+            record_sql_mutation("PROCEDURE", "audit_reports", f"CALL sp_generate_privacy_audit('{gf.zone_name}', eps={effective_eps}) -> Output: {report.reported_count}")
+
     primary = audit_results[0] if audit_results else {
         "geofence_zone": "N/A", "true_count": 0, "laplacian_noise": 0.0, "reported_count": 0, "auto_tuned_epsilon": 0.5, "density_risk_level": "N/A"
     }
@@ -735,6 +985,7 @@ async def get_spatial_logs(limit: int = 1000, db: AsyncSession = Depends(get_db)
 async def reset_spatial_pings(db: AsyncSession = Depends(get_db)):
     await db.execute(text("TRUNCATE TABLE spatial_logs, audit_reports RESTART IDENTITY CASCADE;"))
     await db.commit()
+    record_sql_mutation("TRUNCATE", "spatial_logs", "TRUNCATE TABLE spatial_logs, audit_reports RESTART IDENTITY CASCADE")
     return {"status": "success", "message": "Spatial logs and audit history cleared successfully"}
 
 @app.post("/api/v1/seed-geofences")
@@ -795,6 +1046,7 @@ async def ingest_driver_ping(payload: DynamicDriverPingInput, db: AsyncSession =
     )
     db.add(ping)
     await db.commit()
+    record_sql_mutation("INSERT", "spatial_logs", f"INSERT INTO spatial_logs (driver_id, masked_geohash) VALUES ('{payload.driver_id}', '{ghash}')")
     return {"status": "ingested", "driver_id": payload.driver_id, "masked_geohash": ghash}
 
 @app.get("/api/v1/system/indexing-metadata")

@@ -7,7 +7,7 @@ import axios from 'axios';
 import {
   ShieldAlert, Radio, Activity, RefreshCw, Zap,
   EyeOff, Trash2, Cpu, BarChart3, PlusCircle, MapPin, MousePointer, Info, AlertTriangle, Edit2, Check, X, Database, Clock, LayoutDashboard, Sliders,
-  Key, Copy, Plus, Lock, Unlock, Siren, AlertCircle, ChevronLeft, ChevronRight, Grid
+  Key, Copy, Plus, Lock, Unlock, Siren, AlertCircle, ChevronLeft, ChevronRight, Grid, Archive, Shield
 } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -79,6 +79,7 @@ function decodeGeohash(geohash) {
   return [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
 }
 
+// Map Click Handler Re-bound on Key Change
 function MapClickHandler({ mapMode, onMapClick }) {
   useMapEvents({
     click(e) {
@@ -356,6 +357,189 @@ function BreakGlassModal({ onClose, logs }) {
   );
 }
 
+// ADMIN SECONDARY STORAGE COLD VAULT COMPONENT
+export function AdminSecondaryStorageVault() {
+  const [passkey, setPasskey] = useState('admin_secret_passkey_2026');
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [vaultData, setVaultData] = useState(null);
+  const [activeTab, setActiveTab] = useState('pings');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const unlockVault = async (e) => {
+    e?.preventDefault();
+    if (!passkey.trim()) return;
+
+    setIsLoading(true);
+    setErrorMsg('');
+
+    try {
+      const res = await axios.get(`${API_BASE}/api/v1/admin/archives`, {
+        headers: { 'x-admin-passkey': passkey }
+      });
+      setVaultData(res.data);
+      setIsUnlocked(true);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.detail || 'Invalid Administrative Passkey!');
+      setIsUnlocked(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const lockVault = () => {
+    setIsUnlocked(false);
+    setVaultData(null);
+  };
+
+  return (
+    <div className="table-card" style={{ marginTop: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Archive size={20} color="#818CF8" />
+          <h3 className="card-title" style={{ margin: 0, color: '#818CF8' }}>Admin Secondary Storage Cold Vault</h3>
+        </div>
+
+        {isUnlocked && (
+          <button
+            onClick={lockVault}
+            className="btn-danger"
+            style={{ padding: '6px 12px', fontSize: '11px', marginBottom: 0 }}
+          >
+            <Lock size={13} /> Lock Cold Vault
+          </button>
+        )}
+      </div>
+
+      {!isUnlocked ? (
+        <form onSubmit={unlockVault} style={{
+          backgroundColor: '#0F172A',
+          border: '1px dashed #334155',
+          padding: '24px',
+          borderRadius: '8px',
+          textAlign: 'center',
+          maxWidth: '460px',
+          margin: '0 auto'
+        }}>
+          <Lock size={32} color="#F59E0B" style={{ marginBottom: '10px' }} />
+          <h4 style={{ margin: '0 0 6px 0', color: '#F3F4F6', fontSize: '14px' }}>Restricted Cold Storage Access</h4>
+          <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '16px' }}>
+            Enter your Administrative Passkey to inspect archived location pings and differential privacy audits.
+          </p>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <input
+              type="password"
+              placeholder="Enter Admin Passkey..."
+              value={passkey}
+              onChange={(e) => setPasskey(e.target.value)}
+              className="input-mini"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn-primary"
+              style={{ width: 'auto', whiteSpace: 'nowrap' }}
+            >
+              {isLoading ? <RefreshCw size={13} className="spin" /> : <Unlock size={13} />} Unlock
+            </button>
+          </div>
+
+          {errorMsg && (
+            <div style={{ color: '#F87171', fontSize: '11px', marginTop: '6px' }}>
+              ⚠️ {errorMsg}
+            </div>
+          )}
+        </form>
+      ) : (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setActiveTab('pings')}
+                className={activeTab === 'pings' ? 'pill-btn active' : 'pill-btn'}
+              >
+                Archived Pings ({vaultData?.total_archived_pings || 0})
+              </button>
+              <button
+                onClick={() => setActiveTab('audits')}
+                className={activeTab === 'audits' ? 'pill-btn active' : 'pill-btn'}
+              >
+                Archived Audits ({vaultData?.total_archived_audits || 0})
+              </button>
+            </div>
+
+            <button onClick={() => unlockVault()} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '11px' }}>
+              <RefreshCw size={12} /> Sync Cold Vault
+            </button>
+          </div>
+
+          <div className="table-wrapper" style={{ maxHeight: '320px' }}>
+            {activeTab === 'pings' ? (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th className="th">Archive ID</th>
+                    <th className="th">Driver ID</th>
+                    <th className="th">Masked Geohash</th>
+                    <th className="th">Recorded At</th>
+                    <th className="th">Archived At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vaultData?.archived_pings?.length === 0 ? (
+                    <tr><td colSpan="5" className="empty-td">No archived pings found in secondary storage.</td></tr>
+                  ) : (
+                    vaultData?.archived_pings?.map((row) => (
+                      <tr key={row.archive_id} className="tr">
+                        <td className="td-monospace">#{row.archive_id}</td>
+                        <td className="td-monospace-bold">{row.driver_id}</td>
+                        <td className="td-encrypted"><code>{row.masked_geohash}</code></td>
+                        <td className="td-monospace">{row.recorded_at}</td>
+                        <td style={{ color: '#34D399', fontFamily: 'monospace', fontSize: '11px' }}>{row.archived_at}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th className="th">Report ID</th>
+                    <th className="th">Geofence ID</th>
+                    <th className="th">True Count</th>
+                    <th className="th">Laplace Noise</th>
+                    <th className="th">Reported Count</th>
+                    <th className="th">Archived At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vaultData?.archived_audits?.length === 0 ? (
+                    <tr><td colSpan="6" className="empty-td">No archived audit reports found in secondary storage.</td></tr>
+                  ) : (
+                    vaultData?.archived_audits?.map((row) => (
+                      <tr key={row.archive_id} className="tr">
+                        <td className="td-monospace">{row.report_id.slice(0, 8)}...</td>
+                        <td className="td-monospace">{row.geofence_id.slice(0, 8)}...</td>
+                        <td className="td-monospace-bold" style={{ color: '#38BDF8' }}>{row.true_count}</td>
+                        <td className="td-monospace" style={{ color: '#F59E0B' }}>{row.laplacian_noise}</td>
+                        <td className="td-monospace-bold" style={{ color: '#34D399' }}>{row.reported_count}</td>
+                        <td style={{ color: '#9CA3AF', fontFamily: 'monospace', fontSize: '11px' }}>{row.archived_at}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MainApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [logs, setLogs] = useState([]);
@@ -456,7 +640,6 @@ function MainApp() {
     }
   };
 
-  // UNIFIED LIVE SYNC POLLING LOOP (EVERY 3 SECONDS)
   useEffect(() => {
     const init = async () => {
       await axios.post(`${API_BASE}/api/v1/seed-geofences`).catch(() => { });
@@ -482,10 +665,13 @@ function MainApp() {
     if (!coords || isNaN(coords[0]) || isNaN(coords[1])) return;
 
     if (mapMode === 'driver') {
-      setCustomLat(coords[0].toFixed(6));
-      setCustomLon(coords[1].toFixed(6));
+      const latStr = coords[0].toFixed(6);
+      const lonStr = coords[1].toFixed(6);
+      setCustomLat(latStr);
+      setCustomLon(lonStr);
       setMapMode('none');
       setValidationError('');
+      alert(`📍 Driver Location Selected!\nLatitude: ${latStr}\nLongitude: ${lonStr}`);
     } else if (mapMode === 'geofence') {
       const updated = [...drawnGeofencePoints, coords];
       setDrawnGeofencePoints(updated);
@@ -664,7 +850,7 @@ function MainApp() {
             <span className="header-metric-divider">•</span>
             <span className="header-metric-item"><b>Reported:</b> <span style={{ color: '#34D399', fontWeight: '700' }}>{autoAuditState.reported_count}</span></span>
             <span className="header-metric-divider">•</span>
-            <span className="header-metric-item" style={{ color: '#60A5FA', fontWeight: 'bold' }}>🛡️ 3-Min Auto-Purge</span>
+            <span className="header-metric-item" style={{ color: '#60A5FA', fontWeight: 'bold' }}>🛡️ 1.5-Min Auto-Purge</span>
           </div>
         </div>
       </header>
@@ -833,14 +1019,28 @@ function MainApp() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; OpenStreetMap contributors'
                 />
-                <MapClickHandler mapMode={mapMode} onMapClick={handleMapClick} />
+
+                {/* RE-BOUND MAP CLICK HANDLER ON MAPMODE CHANGE */}
+                <MapClickHandler key={mapMode} mapMode={mapMode} onMapClick={handleMapClick} />
 
                 {/* ACTIVE DELIVERY GEOFENCES */}
                 {activeGeofences.map((geo) => {
                   if (!geo || !Array.isArray(geo.bounds) || geo.bounds.length < 3) return null;
                   return (
-                    <Polygon key={geo.geofence_id} positions={geo.bounds} pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}>
-                      <Popup><b>{geo.name}</b></Popup>
+                    <Polygon
+                      key={geo.geofence_id}
+                      positions={geo.bounds}
+                      pathOptions={{ color: geo.color || '#3B82F6', fillColor: geo.color || '#3B82F6', fillOpacity: 0.2, weight: 2 }}
+                      interactive={mapMode === 'none'}
+                      eventHandlers={{
+                        click: (e) => {
+                          if (mapMode !== 'none') {
+                            handleMapClick([e.latlng.lat, e.latlng.lng]);
+                          }
+                        }
+                      }}
+                    >
+                      {mapMode === 'none' && <Popup><b>{geo.name}</b></Popup>}
                     </Polygon>
                   );
                 })}
@@ -855,7 +1055,7 @@ function MainApp() {
                   </>
                 )}
 
-                {/* PRIVACY-PRESERVING GEOHASH SPATIAL GRID TILES (AGGREGATED PATTERN INSTEAD OF POINT BREADCRUMBS) */}
+                {/* PRIVACY-PRESERVING GEOHASH SPATIAL GRID TILES */}
                 {(() => {
                   const tileGroups = {};
                   logs.forEach(log => {
@@ -884,17 +1084,27 @@ function MainApp() {
                           weight: 2,
                           dashArray: '4, 4'
                         }}
+                        interactive={mapMode === 'none'}
+                        eventHandlers={{
+                          click: (e) => {
+                            if (mapMode !== 'none') {
+                              handleMapClick([e.latlng.lat, e.latlng.lng]);
+                            }
+                          }
+                        }}
                       >
-                        <Popup>
-                          <b style={{ color: '#2563EB' }}>CryptoSpatial 153m Grid Tile</b><br />
-                          <b>Geohash:</b> <code>{tile.geohash}</code><br />
-                          <b>Grid Resolution:</b> 153m x 153m<br />
-                          <b>Aggregated Telemetry Pings:</b> {tile.count}<br />
-                          <b>Active Fleet Drivers:</b> {Array.from(tile.drivers).join(', ') || 'DRV-9042'}<br />
-                          <span style={{ color: '#10B981', fontSize: '10px', fontWeight: 'bold' }}>
-                            ✓ Privacy Pattern Active (Individual Route Redacted)
-                          </span>
-                        </Popup>
+                        {mapMode === 'none' && (
+                          <Popup>
+                            <b style={{ color: '#2563EB' }}>CryptoSpatial 153m Grid Tile</b><br />
+                            <b>Geohash:</b> <code>{tile.geohash}</code><br />
+                            <b>Grid Resolution:</b> 153m x 153m<br />
+                            <b>Aggregated Telemetry Pings:</b> {tile.count}<br />
+                            <b>Active Fleet Drivers:</b> {Array.from(tile.drivers).join(', ') || 'DRV-9042'}<br />
+                            <span style={{ color: '#10B981', fontSize: '10px', fontWeight: 'bold' }}>
+                              ✓ Privacy Pattern Active (Individual Route Redacted)
+                            </span>
+                          </Popup>
+                        )}
                       </Rectangle>
                     );
                   });
@@ -999,6 +1209,9 @@ function MainApp() {
                 </table>
               </div>
             </div>
+
+            {/* ADMIN SECONDARY COLD STORAGE VAULT */}
+            <AdminSecondaryStorageVault />
           </div>
         </>
       )}
