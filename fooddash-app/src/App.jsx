@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 const SDK_BASE = 'http://127.0.0.1:8000/v1/sdk';
+const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
 // Calculate exact 153m x 153m Base32 Geohash Bounding Box [[latMin, lonMin], [latMax, lonMax]]
 function decodeGeohashBounds(geohash) {
@@ -114,6 +115,12 @@ export default function App() {
   const [showControlPanel, setShowControlPanel] = useState(false);
   const [cardMinimized, setCardMinimized] = useState(false);
 
+  // REF SYNCHRONIZATION TO PREVENT STALE CLOSURES IN ASYNC INTERVALS
+  const apiKeyRef = useRef(apiKey);
+  useEffect(() => {
+    apiKeyRef.current = apiKey;
+  }, [apiKey]);
+
   // Fleet & Driver State
   const [driverId, setDriverId] = useState('DRV-9042');
   const [driverName, setDriverName] = useState('Ramesh Kumar');
@@ -125,7 +132,7 @@ export default function App() {
   const [pickMode, setPickMode] = useState('none');
 
   const [routePath, setRoutePath] = useState([[12.9352, 77.6245], [12.9280, 77.6380]]);
-  const [privacyMode, setPrivacyMode] = useState('legacy');
+  const [privacyMode, setPrivacyMode] = useState('cryptospatial');
 
   // Explicit Delivery Lifecycle: 'idle' | 'delivering' | 'paused' | 'completed'
   const [deliveryState, setDeliveryState] = useState('idle');
@@ -142,11 +149,46 @@ export default function App() {
   const restaurantZoneBounds = createPointBounds(restaurantCoords);
   const customerZoneBounds = createPointBounds(customerCoords);
 
+  const addSdkLog = (type, detail, status) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setSdkLogs(prev => [{ id: Date.now(), timestamp, type, detail, status }, ...prev.slice(0, 9)]);
+  };
+
+  // AUTO-PROVISION PRODUCTION API KEY ON BOOT FROM ENGINE DB
   useEffect(() => {
-    if (!keyValidated && privacyMode === 'cryptospatial') {
-      setPrivacyMode('legacy');
-    }
-  }, [keyValidated, privacyMode]);
+    const autoProvisionKey = async () => {
+      try {
+        const genRes = await axios.post(`${SDK_BASE}/keys/generate`, {
+          client_name: "FoodDash Dispatch Partner"
+        });
+
+        if (genRes.data && genRes.data.raw_api_key) {
+          const newKey = genRes.data.raw_api_key;
+          setApiKey(newKey);
+          apiKeyRef.current = newKey;
+
+          // Omit client timestamp; PostgreSQL assigns server default
+          const maskRes = await axios.post(`${SDK_BASE}/telemetry/mask`, {
+            driver_id: driverId,
+            raw_latitude: restaurantCoords[0],
+            raw_longitude: restaurantCoords[1],
+            precision: 7
+          }, {
+            headers: { "X-API-Key": newKey }
+          });
+
+          if (maskRes.data && maskRes.data.status === 'success') {
+            setKeyValidated(true);
+            setMaskedGeohash(maskRes.data.masked_geohash);
+            addSdkLog('AUTH_AUTO', `Live API Key generated & stored in DB [${newKey.slice(0, 12)}...]`, '200 OK');
+          }
+        }
+      } catch (err) {
+        addSdkLog('AUTH_WARN', 'Failed to auto-provision key. Please connect key manually.', 'DISCONNECTED');
+      }
+    };
+    autoProvisionKey();
+  }, []);
 
   useEffect(() => {
     fetchOSRMRoadRoute(restaurantCoords, customerCoords).then(path => {
@@ -157,7 +199,8 @@ export default function App() {
   }, [restaurantCoords, customerCoords]);
 
   const handleConnectApiKey = async () => {
-    if (!apiKey.trim()) {
+    const targetKey = apiKey.trim();
+    if (!targetKey) {
       alert("Please enter a valid Middleware API Key (e.g., cs_live_...)");
       return;
     }
@@ -168,27 +211,29 @@ export default function App() {
         raw_longitude: restaurantCoords[1],
         precision: 7
       }, {
-        headers: { "X-API-Key": apiKey }
+        headers: { "X-API-Key": targetKey }
       });
+
       if (res.data && res.data.status === 'success') {
+        setApiKey(targetKey);
+        apiKeyRef.current = targetKey;
         setKeyValidated(true);
         setPrivacyMode('cryptospatial');
-        addSdkLog('AUTH', 'API Key validated via SHA-256. CryptoSpatial Shield Unlocked!', '200 OK');
+        setMaskedGeohash(res.data.masked_geohash);
+        addSdkLog('AUTH_MANUAL', 'API Key verified via SHA-256 in PostgreSQL! Live Sync Active.', '200 OK');
+        alert("✓ API Key verified with PostgreSQL DB! Live Inspector Sync is active.");
       }
     } catch (err) {
-      alert("Invalid or Revoked API Key! Generate a key on Port 5173.");
+      const detail = err.response?.data?.detail || "Invalid or Revoked API Key!";
+      alert(`Authorization Failed: ${detail}`);
+      addSdkLog('AUTH_ERR', detail, '401 UNAUTHORIZED');
       setKeyValidated(false);
     }
   };
 
   const handleTogglePrivacyMode = (targetMode) => {
-    if (targetMode === 'cryptospatial' && !keyValidated) {
-      alert("🔒 API Key Required!\n\nConnect an active CryptoSpatial API Key to unlock Zero-Trust Edge Shielding.");
-      setShowControlPanel(true);
-      setActiveTab('sdk');
-      return;
-    }
     setPrivacyMode(targetMode);
+    addSdkLog('MODE_SWITCH', `Switched telemetry mode to [${targetMode.toUpperCase()}]`, 'ACTIVE');
   };
 
   // Delivery Controls: Start, Pause, Stop
@@ -213,12 +258,7 @@ export default function App() {
   };
 
   const handleUpdateDriver = async () => {
-    if (!keyValidated) {
-      alert("🔒 API Key Required!\n\nConnect an API key to sync driver fleet updates directly to the engine database.");
-      setShowControlPanel(true);
-      setActiveTab('sdk');
-      return;
-    }
+    const activeKey = apiKeyRef.current;
     try {
       await axios.post(`${SDK_BASE}/telemetry/mask`, {
         driver_id: driverId,
@@ -226,12 +266,14 @@ export default function App() {
         raw_longitude: currentRawPos[1],
         precision: 7
       }, {
-        headers: { "X-API-Key": apiKey }
+        headers: { "X-API-Key": activeKey }
       });
       addSdkLog('FLEET_SYNC', `Driver metadata [${driverName} (${driverId})] synced to DB`, '200 OK');
       alert(`✓ Fleet metadata for ${driverName} (${driverId}) synced to central DB!`);
     } catch (err) {
-      alert("Failed to sync driver details to backend.");
+      const msg = err.response?.data?.detail || "Failed to sync driver metadata";
+      alert(`Sync Error: ${msg}`);
+      addSdkLog('SYNC_ERR', msg, 'FAIL');
     }
   };
 
@@ -244,27 +286,26 @@ export default function App() {
       setPickMode('none');
     }
 
-    if (keyValidated) {
-      try {
-        await axios.post(`${SDK_BASE}/telemetry/mask`, {
-          driver_id: driverId,
-          raw_latitude: coords[0],
-          raw_longitude: coords[1],
-          precision: 7
-        }, {
-          headers: { "X-API-Key": apiKey }
-        });
-        addSdkLog('ROUTE_SYNC', `New route endpoint [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}] synced to DB`, '200 OK');
-      } catch (err) { }
+    const activeKey = apiKeyRef.current;
+    try {
+      const res = await axios.post(`${SDK_BASE}/telemetry/mask`, {
+        driver_id: driverId,
+        raw_latitude: coords[0],
+        raw_longitude: coords[1],
+        precision: 7
+      }, {
+        headers: { "X-API-Key": activeKey }
+      });
+      if (res.data && res.data.masked_geohash) {
+        setMaskedGeohash(res.data.masked_geohash);
+      }
+      addSdkLog('ROUTE_SYNC', `New route point [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}] synced to DB`, '200 OK');
+    } catch (err) {
+      addSdkLog('ROUTE_ERR', 'Location update failed to reach DB', 'WARN');
     }
   };
 
-  const addSdkLog = (type, detail, status) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setSdkLogs(prev => [{ id: Date.now(), timestamp, type, detail, status }, ...prev.slice(0, 9)]);
-  };
-
-  // Controlled Telemetry Simulation Loop
+  // CONTROLLED TELEMETRY SIMULATION LOOP (USES apiKeyRef FOR LIVE POST-INGESTION SYNC)
   useEffect(() => {
     if (deliveryState !== 'delivering') return;
 
@@ -278,34 +319,50 @@ export default function App() {
 
         const nextStep = prev + 1;
         const [nextLat, nextLon] = routePath[nextStep];
+        const activeKey = apiKeyRef.current;
 
-        if (privacyMode === 'cryptospatial' && keyValidated) {
+        if (privacyMode === 'cryptospatial') {
+          // MASKED TELEMETRY INGESTION (SERVER-CLOCK SYNCHRONIZED)
           axios.post(`${SDK_BASE}/telemetry/mask`, {
             driver_id: driverId,
             raw_latitude: nextLat,
             raw_longitude: nextLon,
             precision: 7
           }, {
-            headers: { "X-API-Key": apiKey }
+            headers: { "X-API-Key": activeKey }
           }).then(res => {
             if (res.data && res.data.masked_geohash) {
               setMaskedGeohash(res.data.masked_geohash);
-              addSdkLog('SDK_MASK', `Edge Purge -> Masked Tile [${res.data.masked_geohash}]`, '200 OK');
+              addSdkLog('SDK_MASK', `DB Ingest -> Geohash Tile [${res.data.masked_geohash}]`, '200 OK');
             }
-          }).catch(() => {
-            setMaskedGeohash('tdr1w67');
+          }).catch(err => {
+            const errDetail = err.response?.data?.detail || "Key Rejected or Auth Error";
+            addSdkLog('MASK_ERR', `DB Rejected: ${errDetail}`, '401/422');
           });
         } else {
-          addSdkLog('LEGACY', `Raw GPS Expose [${nextLat.toFixed(5)}, ${nextLon.toFixed(5)}]`, 'UNPROTECTED');
+          // LEGACY GPS INGESTION
+          axios.post(`${API_BASE}/driver-pings/ingest`, {
+            driver_id: driverId,
+            latitude: nextLat,
+            longitude: nextLon,
+            enforce_boundary_check: false
+          }).then(res => {
+            if (res.data && res.data.masked_geohash) {
+              setMaskedGeohash(res.data.masked_geohash);
+              addSdkLog('LEGACY_DB', `Raw GPS -> DB Ingested [${nextLat.toFixed(5)}, ${nextLon.toFixed(5)}]`, '200 OK');
+            }
+          }).catch(() => {
+            addSdkLog('LEGACY', `Raw GPS Expose [${nextLat.toFixed(5)}, ${nextLon.toFixed(5)}]`, 'UNPROTECTED');
+          });
         }
 
-        if (nextStep === routePath.length - 1 && keyValidated) {
+        if (nextStep === routePath.length - 1) {
           axios.post(`${SDK_BASE}/zone/proof-of-presence`, {
             driver_id: driverId,
             masked_geohash: maskedGeohash,
             geofence_id: "11111111-1111-1111-1111-111111111111"
           }, {
-            headers: { "X-API-Key": apiKey }
+            headers: { "X-API-Key": activeKey }
           }).then(res => {
             if (res.data && res.data.proof_token) {
               setProofToken(res.data.proof_token);
@@ -319,7 +376,7 @@ export default function App() {
     }, 3200);
 
     return () => clearInterval(interval);
-  }, [deliveryState, privacyMode, apiKey, routePath, driverId, keyValidated, maskedGeohash]);
+  }, [deliveryState, privacyMode, routePath, driverId, maskedGeohash]);
 
   const discretizedTilePath = routePath.map(pt => {
     const bounds = decodeGeohashBounds(maskedGeohash);
@@ -417,18 +474,13 @@ export default function App() {
           boxShadow: '0 10px 25px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: '12px'
         }}>
           <div style={{ backgroundColor: '#000000', padding: '6px 14px', borderRadius: '20px', color: '#FFFFFF', fontWeight: '900', fontSize: '13px', letterSpacing: '0.5px' }}>
-            UBER EATS
+            FOODDASH
           </div>
 
-          {keyValidated ? (
-            <span style={{ fontSize: '11px', fontWeight: '800', color: '#059669', backgroundColor: '#ECFDF5', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #A7F3D0' }}>
-              <Wifi size={13} color="#059669" /> LIVE DB SYNC: ACTIVE
-            </span>
-          ) : (
-            <span style={{ fontSize: '11px', fontWeight: '800', color: '#D97706', backgroundColor: '#FEF3C7', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #FDE68A' }}>
-              <WifiOff size={13} color="#D97706" /> API KEY REQUIRED FOR SHIELD & DB SYNC
-            </span>
-          )}
+          <span style={{ fontSize: '11px', fontWeight: '800', color: keyValidated ? '#059669' : '#D97706', backgroundColor: keyValidated ? '#ECFDF5' : '#FEF3C7', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${keyValidated ? '#A7F3D0' : '#FDE68A'}` }}>
+            {keyValidated ? <Wifi size={13} color="#059669" /> : <WifiOff size={13} color="#D97706" />}
+            {keyValidated ? 'LIVE DB SYNC: ACTIVE' : 'KEY CONNECTING...'}
+          </span>
         </div>
 
         <div style={{
@@ -457,17 +509,8 @@ export default function App() {
               fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
             }}
           >
-            {!keyValidated ? (
-              <>
-                <Lock size={13} color="#D97706" />
-                <span>CryptoSpatial Shield (Locked)</span>
-              </>
-            ) : (
-              <>
-                <Grid size={14} color="#059669" />
-                <span>CryptoSpatial Tile Corridor</span>
-              </>
-            )}
+            <Grid size={14} color="#059669" />
+            <span>CryptoSpatial Tile Corridor</span>
           </button>
         </div>
 
@@ -515,7 +558,7 @@ export default function App() {
                   fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
                 }}
               >
-                <UserPlus size={14} /> Fleet Driver Manager {!keyValidated && '🔒'}
+                <UserPlus size={14} /> Fleet Driver Manager
               </button>
               <button
                 onClick={() => setActiveTab('locations')}
@@ -526,7 +569,7 @@ export default function App() {
                   fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
                 }}
               >
-                <MapPin size={14} /> Road Location Picker {!keyValidated && '🔒'}
+                <MapPin size={14} /> Road Location Picker
               </button>
             </div>
             <button onClick={() => setShowControlPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
@@ -539,8 +582,8 @@ export default function App() {
               <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h4 style={{ margin: 0, fontSize: '13px', color: '#0F172A', fontWeight: '700' }}>Middleware API Key Auth</h4>
-                  <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '12px', backgroundColor: keyValidated ? '#DCFCE7' : '#FEE2E2', color: keyValidated ? '#15803D' : '#991B1B', fontWeight: 'bold' }}>
-                    {keyValidated ? '✓ Connected' : '🔒 Disconnected'}
+                  <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '12px', backgroundColor: keyValidated ? '#DCFCE7' : '#FEF3C7', color: keyValidated ? '#15803D' : '#D97706', fontWeight: 'bold' }}>
+                    {keyValidated ? '✓ Connected' : 'Connecting...'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -563,7 +606,7 @@ export default function App() {
                 </h4>
                 <div style={{ backgroundColor: '#0F172A', borderRadius: '8px', padding: '10px', height: '90px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '11px', color: '#F1F5F9' }}>
                   {sdkLogs.map(log => (
-                    <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: log.type === 'SDK_MASK' ? '#34D399' : '#F87171' }}>
+                    <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: log.type.includes('ERR') || log.type.includes('REJECT') ? '#F87171' : '#34D399' }}>
                       <span>[{log.timestamp}] <b>{log.type}:</b> {log.detail}</span>
                       <span style={{ color: '#38BDF8' }}>{log.status}</span>
                     </div>
@@ -587,9 +630,8 @@ export default function App() {
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Vehicle & Model</label>
                 <input type="text" value={vehicleDetails} onChange={e => setVehicleDetails(e.target.value)} className="studio-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #94A3B8', fontSize: '12px' }} />
               </div>
-              <button onClick={handleUpdateDriver} style={{ backgroundColor: keyValidated ? '#06C167' : '#94A3B8', color: '#FFFFFF', border: 'none', padding: '9px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {keyValidated ? <Database size={14} /> : <Lock size={14} />}
-                {keyValidated ? 'Sync Fleet Metadata to DB' : 'Key Required to Sync'}
+              <button onClick={handleUpdateDriver} style={{ backgroundColor: '#06C167', color: '#FFFFFF', border: 'none', padding: '9px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Database size={14} /> Sync Fleet Metadata to DB
               </button>
             </div>
           )}

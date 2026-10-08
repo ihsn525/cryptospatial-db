@@ -267,7 +267,7 @@ function DpMathSection({ liveTables, autoAuditState }) {
           </div>
         </div>
         <div className="badge-group">
-          <span className="badge-yellow">2D Laplace Distribution</span>
+          <span className="badge-yellow">1D Laplace Distribution</span>
           <span className="badge-purple">ε-Differential Privacy</span>
         </div>
       </div>

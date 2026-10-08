@@ -9,7 +9,7 @@ import uuid
 import json
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import Column, String, BigInteger, DateTime, Float, Integer, Boolean, select, text, delete, func
+from sqlalchemy import Column, String, BigInteger, DateTime, Float, Integer, Boolean, select, text, func
 from sqlalchemy.dialects.postgresql import UUID
 
 # -----------------------------------------------------------------------------
@@ -48,7 +48,7 @@ class SpatialLogModel(Base):
     raw_lat = Column(Float, nullable=True)
     raw_lon = Column(Float, nullable=True)
     masked_geohash = Column(String(12), nullable=False)
-    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class GeofenceModel(Base):
     __tablename__ = "geofences"
@@ -63,7 +63,7 @@ class AuditReportModel(Base):
     true_count = Column(Integer, nullable=False)
     laplacian_noise = Column(Float, nullable=False)
     reported_count = Column(Integer, nullable=False)
-    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+    generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class ApiKeyModel(Base):
     __tablename__ = "api_keys"
@@ -72,7 +72,7 @@ class ApiKeyModel(Base):
     api_key_hash = Column(String(64), unique=True, nullable=False, index=True)
     key_prefix = Column(String(20), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 # SECONDARY COLD STORAGE ARCHIVE MODELS
 class ArchivedSpatialLogModel(Base):
@@ -86,7 +86,7 @@ class ArchivedSpatialLogModel(Base):
 
 class ArchivedAuditReportModel(Base):
     __tablename__ = "archived_audit_reports"
-    archive_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    archive_id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     report_id = Column(UUID(as_uuid=True), nullable=False)
     geofence_id = Column(UUID(as_uuid=True), nullable=False)
     true_count = Column(Integer, nullable=False)
@@ -259,64 +259,66 @@ class ApiKeyGenerateResponse(BaseModel):
     warning: str
 
 # -----------------------------------------------------------------------------
-# BACKGROUND WORKERS (EPHEMERAL PURGE WITH SERVER TIME & AUTO AUDIT)
+# BACKGROUND WORKERS (ATOMIC CTE EPHEMERAL PURGE & AUTO AUDIT)
 # -----------------------------------------------------------------------------
 auto_audit_enabled = True
+purge_worker_task = None
+audit_worker_task = None
 
 async def auto_purge_ephemeral_data():
     """
-    Moves expired location pings and audit reports (>90s old) into 
-    secondary cold storage tables using PostgreSQL server time to avoid clock skew.
+    Background worker using PostgreSQL server time NOW() to move expired pings (>90s)
+    into cold vault archives using atomic CTEs without locking table reads.
     """
+    print("📦 [COLD VAULT] Secondary Cold Storage Purge Worker Initialized.")
     while True:
         try:
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)  # Poll every 5 seconds
             async with AsyncSessionLocal() as db:
-                # A. Move expired location pings to Secondary Cold Storage
-                arch_pings_sql = text("""
+                # 1. ATOMIC ARCHIVE & PURGE FOR SPATIAL LOGS (> 90 Seconds Old)
+                purge_pings_query = text("""
+                    WITH expired_pings AS (
+                        DELETE FROM spatial_logs
+                        WHERE recorded_at < (NOW() - INTERVAL '90 seconds')
+                        RETURNING log_id, driver_id, masked_geohash, recorded_at
+                    )
                     INSERT INTO archived_spatial_logs (log_id, driver_id, masked_geohash, recorded_at, archived_at)
                     SELECT log_id, driver_id, masked_geohash, recorded_at, NOW()
-                    FROM spatial_logs
-                    WHERE recorded_at < (NOW() - INTERVAL '90 seconds');
+                    FROM expired_pings;
                 """)
-                await db.execute(arch_pings_sql)
-                
-                # Delete expired pings from primary table
-                del_pings_sql = text("""
-                    DELETE FROM spatial_logs 
-                    WHERE recorded_at < (NOW() - INTERVAL '90 seconds');
-                """)
-                res_logs = await db.execute(del_pings_sql)
-                
-                # B. Move expired audit reports to Secondary Cold Storage
-                arch_audits_sql = text("""
-                    INSERT INTO archived_audit_reports (report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at, archived_at)
-                    SELECT report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at, NOW()
-                    FROM audit_reports
-                    WHERE generated_at < (NOW() - INTERVAL '90 seconds');
-                """)
-                await db.execute(arch_audits_sql)
-                
-                # Delete expired audit reports from primary table
-                del_audits_sql = text("""
-                    DELETE FROM audit_reports 
-                    WHERE generated_at < (NOW() - INTERVAL '90 seconds');
-                """)
-                res_audits = await db.execute(del_audits_sql)
-                
-                await db.commit()
-                
-                if res_logs.rowcount > 0:
-                    record_sql_mutation("DELETE", "spatial_logs", f"DELETE FROM spatial_logs (Archived {res_logs.rowcount} rows to archived_spatial_logs)")
-                if res_audits.rowcount > 0:
-                    record_sql_mutation("DELETE", "audit_reports", f"DELETE FROM audit_reports (Archived {res_audits.rowcount} rows to archived_audit_reports)")
+                res_logs = await db.execute(purge_pings_query)
 
-                if res_logs.rowcount > 0 or res_audits.rowcount > 0:
-                    print(f"📦 [Cold Storage Vault] Archived {res_logs.rowcount} pings & {res_audits.rowcount} audit reports to secondary storage.")
+                # 2. ATOMIC ARCHIVE & PURGE FOR AUDIT REPORTS (> 90 Seconds Old)
+                purge_audits_query = text("""
+                    WITH expired_audits AS (
+                        DELETE FROM audit_reports
+                        WHERE generated_at < (NOW() - INTERVAL '90 seconds')
+                        RETURNING report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at
+                    )
+                    INSERT INTO archived_audit_reports (archive_id, report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at, archived_at)
+                    SELECT gen_random_uuid(), report_id, geofence_id, true_count, laplacian_noise, reported_count, generated_at, NOW()
+                    FROM expired_audits;
+                """)
+                res_audits = await db.execute(purge_audits_query)
+
+                await db.commit()
+
+                logs_count = res_logs.rowcount or 0
+                audits_count = res_audits.rowcount or 0
+
+                if logs_count > 0:
+                    record_sql_mutation("DELETE", "spatial_logs", f"ARCHIVED & PURGED {logs_count} expired pings (>90s)")
+                if audits_count > 0:
+                    record_sql_mutation("DELETE", "audit_reports", f"ARCHIVED & PURGED {audits_count} expired audit reports (>90s)")
+
+                if logs_count > 0 or audits_count > 0:
+                    print(f"📦 [COLD VAULT SUCCESS] Automatically archived {logs_count} pings & {audits_count} audit reports.")
+
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"⚠️ Secondary storage archive error: {e}")
+            print(f"⚠️ [COLD VAULT PURGE ERROR]: {e}")
+            await asyncio.sleep(5)
 
 async def background_audit_worker():
     await asyncio.sleep(4)
@@ -349,6 +351,7 @@ async def background_audit_worker():
 # -----------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global purge_worker_task, audit_worker_task
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
@@ -363,14 +366,16 @@ async def lifespan(app: FastAPI):
             ON spatial_logs USING GIST (geom);
         """))
 
-    purge_task = asyncio.create_task(auto_purge_ephemeral_data())
-    audit_task = asyncio.create_task(background_audit_worker())
+    purge_worker_task = asyncio.create_task(auto_purge_ephemeral_data())
+    audit_worker_task = asyncio.create_task(background_audit_worker())
     print("🚀 CryptoSpatial Engine initialized with GiST R-Tree Indexing & Secondary Cold Storage Vault.")
     
     yield
     
-    purge_task.cancel()
-    audit_task.cancel()
+    if purge_worker_task:
+        purge_worker_task.cancel()
+    if audit_worker_task:
+        audit_worker_task.cancel()
 
 app = FastAPI(
     title="CryptoSpatial-DB Engine - DBTHON Edition",
@@ -717,7 +722,7 @@ async def get_privacy_count(geofence_id: str, db: AsyncSession = Depends(get_db)
         true_driver_density=true_count,
         auto_tuned_epsilon=effective_eps,
         density_risk_level=risk_level,
-        applied_mechanism="2D Laplace Distribution (In-Database)"
+        applied_mechanism="1D Laplace Noise over 2D Spatial Aggregation"
     )
 
 @sdk_router.post("/emergency/break-glass", response_model=BreakGlassResponse)
