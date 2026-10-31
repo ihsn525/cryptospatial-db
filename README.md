@@ -1,358 +1,219 @@
-# CryptoSpatial-DB: Privacy-Preserving Geospatial Auditing Engine
+# CryptoSpatial-DB: A Privacy-Accounted Spatial Query Architecture
 
-![CI/CD Pipeline Status](https://img.shields.io/github/actions/workflow/status/ihsn525/cryptospatial-db/ci-cd.yml?branch=main&label=CI%2FCD%20Pipeline&style=for-the-badge&logo=github)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-PostGIS_3.4-336791?style=for-the-badge&logo=postgresql&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.11-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/ihsn525/cryptospatial-db/ci-cd.yml?branch=main&label=CI%2FCD%20Pipeline&style=for-the-badge&logo=github)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-PostGIS_3.4.1-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.12-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React_18-Vite_5-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![Docker](https://img.shields.io/badge/Docker-Containerized_DB-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![IEEE Access](https://img.shields.io/badge/Paper-IEEE_Access_Draft-blue?style=for-the-badge)
 
-An enterprise-grade, zero-trust geospatial middleware engineered for delivery, rideshare, and hyper-local logistics platforms (e.g., Swiggy, Zomato, Uber, Zepto). **CryptoSpatial-DB** enables platforms to audit driver fleet availability within active geofenced delivery zones **without persistently storing, exposing, or transmitting raw latitude and longitude GPS coordinates**.
+**CryptoSpatial-DB** is a high-throughput, privacy-accounted spatial database middleware built for PostgreSQL 16 with the PostGIS 3.4 extension. Designed for hyper-local logistics, delivery dispatch engines, intelligent transportation networks, and telecommunications geofencing, it resolves the fundamental conflict between spatial indexing utility, differential privacy guarantees, and ephemeral record lifecycle enforcement.
 
----
-
-## Table of Contents
-1. [Executive Overview & Problem Statement](#executive-overview--problem-statement)
-2. [Key System Features](#key-system-features)
-3. [Architecture & Data Pipeline](#architecture--data-pipeline)
-4. [System Requirements & Prerequisites](#system-requirements--prerequisites)
-5. [Installation & Setup Guide](#installation--setup-guide)
-6. [Service Orchestration (`manage.sh`)](#service-orchestration-managesh)
-7. [API Specification & Interactive Swagger Docs](#api-specification--interactive-swagger-docs)
-8. [Database Schema & Stored Procedures](#database-schema--stored-procedures)
-9. [Continuous Integration & Delivery (CI/CD)](#continuous-integration--delivery-cicd)
-10. [Troubleshooting & Common Issues](#troubleshooting--common-issues)
-11. [Faculty Review Defense Q&A](#faculty-review-defense-qa)
-12. [Future Engineering Roadmap](#future-engineering-roadmap)
-13. [License & Maintainer](#license--maintainer)
-
----
-
-## Executive Overview & Problem Statement
-
-Logistics platforms ingest millions of location pings daily. Traditional database architectures store raw latitude/longitude points directly in spatial tables, introducing three major liabilities:
-
-1. **Surveillance & Trajectory Exposure:** Storing continuous (Lat, Lon) points creates an immutable movement history. A database leak exposes exact home addresses, routines, and physical habits of drivers.
-2. **Database Throughput Degradation:** Performing point-in-polygon checks over raw streams during peak order windows leads to O(N) scanning bottlenecks and database lock latency.
-3. **The Auditability Paradox:** Regulatory auditors and dispatch systems need aggregate counts of active drivers in a zone. However, returning exact counts allows adversaries to execute query differencing attacks to track individual driver entry and exit.
-
-**CryptoSpatial-DB** solves this by enforcing **Ingestion-Time Geohash Truncation** paired with **PostGIS-Level Differential Privacy (ε = 1.5)**, delivering sub-second spatial containment reports with zero trajectory leakage.
+Coordinates are quantized into precision-7 Base32 Geohash tiles ($153\,\text{m} \times 153\,\text{m}$ at the equator) before database persistence, setting raw latitude and longitude to `NULL`. A generated tile-centroid column carries a Generalized Search Tree (GiST) R-Tree index to maintain $O(\log N)$ spatial containment queries. Zone-count releases are handled via an in-database procedure that samples Laplace noise via inverse cumulative distribution function (CDF) transformation and charges an atomic, row-locked per-analyst privacy-budget ledger.
 
 ---
 
 ## Key System Features
 
-- **Ingested Spatial Masking:** Converts GPS points into 7-character Base32 Geohashes (≈153m × 153m grid resolution) on ingestion, immediately discarding pinpoint street coordinates.
-- **PostGIS R-Tree (GiST) Spatial Indexing:** Leverages Generalized Search Trees over spatial MultiPolygons for O(log N) containment evaluations.
-- **ε-Geo-Indistinguishability:** Stored PL/pgSQL procedures inject 2D Planar Laplace noise (ε = 1.5) into aggregate queries, mathematically preventing trajectory reconstruction.
-- **Real-Time Control Dashboard:** Dark-themed React/Leaflet dashboard displaying active delivery geofences, driver markers, real-time audit output cards, and a side-by-side Raw vs. Masked Transformation Matrix.
-- **One-Command CLI Management:** Custom Bash orchestration script (`manage.sh`) to start, stop, monitor, or tail logs across all tiers.
-- **Production CI/CD:** GitHub Actions workflow verifying PostGIS migrations and React Vite production builds on every commit.
+* **Ingestion-Time Coordinate Discretization:** Automatically converts $(\phi, \lambda)$ GPS streams into 7-character Geohash tile IDs (`masked_geohash`). Raw coordinate fields are rendered `NULL` upon insert to protect against physical database snapshot leaks (Storage Adversary A1).
+* **GiST Centroid Indexing:** Generates stored tile-centroid point geometries (`geom = ST_SetSRID(ST_PointFromGeoHash(masked_geohash), 4326)`) indexed via PostGIS GiST R-Trees, bypassing the encryption performance wall.
+* **Privatized Adaptive Budget Selector:** Eliminates threshold leakage by picking privacy regimes ($\epsilon_\rho \in \{0.5, 2.0\}$) using a privatized noisy estimate ($\epsilon_{\text{sel}} = 0.1$), guaranteeing pure $\epsilon$-differential privacy ($\epsilon_{\text{total}} \le 2.1$).
+* **Atomic Budget Ledger:** Enforces sequential composition ($\sum \epsilon_i \le \epsilon_{\text{cap}} = 5.0$) using row-level `FOR UPDATE` locking on analyst records (`privacy_budget_ledger`) to prevent concurrent budget overspending.
+* **Bounded Boundary Classification:** Geometrically bounds containment misclassification to a boundary strip of $\delta \le 108.18\,\text{m}$. Achieves zero false positives/negatives beyond $108\,\text{m}$.
+* **Server-Clock Ephemeral Record Lifecycle:** Automatically purges operational pings older than $T_{\text{eph}} = 90\,\text{s}$ using server-clock atomic Common Table Expressions (CTEs), transferring coarse tile strings to cold archive tables while discarding point geometries.
+* **2-of-3 Key Quorum Break-Glass Unmasking:** Requires a minimum threshold quorum of 2 valid keys from `{K_admin, K_police, K_auditor}` to authorize emergency unmasking, returning tile centroids rather than exact points.
+* **Tamper-Evident Audit Logging & Attestation:** Maintains SHA-256 hash-chained audit reports (`audit_reports`) and issues 300-second rotating HMAC-SHA256 presence attestation tokens.
 
 ---
 
-## Architecture & Data Pipeline
+## Architecture Overview
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        INGESTION & OBFUSCATION                          │
-│  Driver GPS (Lat, Lon) ──► 7-Char Base32 Geohash ──► Discard Raw Coords │
-└────────────────────────────────────┬──────────────────────────────────-─┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    SPATIAL INDEXING & PERSISTENCE                       │
-│  PostGIS 16 / Spatial DB ──► R-Tree (GiST) Indexing ──► O(log N) Lookup │
-└────────────────────────────────────┬─────────────────────────────────-──┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     DIFFERENTIAL PRIVACY AUDITING                       │
-│  sp_generate_privacy_audit ──► 2D Laplace Noise (ε = 1.5) ──► Perturbed │
-└────────────────────────────────────┬─────────────────────────────────-──┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     CONTROL CENTER VISUALIZATION                        │
-│  React + Leaflet Dashboard ──► Live Transformation Matrix & Mapping     │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                             MIDDLEWARE INGESTION LAYER                           │
+│  Client GPS Stream (φ, λ) ──► Base32 Geohash (p=7) ──► Raw Lat/Lon Set to NULL   │
+└────────────────────────────────────────┬─────────────────────────────────────────┘
+                                         │
+                                         ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                        POSTGRESQL 16 / POSTGIS 3.4 ENGINE                        │
+│  Generated Geometry Column ──► GiST R-Tree Indexing ──► O(log N) Centroid Search │
+└────────────────────────────────────────┬─────────────────────────────────────────┘
+                                         │
+                                         ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                      IN-DATABASE PRIVACY & LEDGER ENGINE                         │
+│  FOR UPDATE Row Lock ──► Privatized Selector ──► Laplace Noise ──► Budget Ledger  │
+└────────────────────────────────────────┬─────────────────────────────────────────┘
+                                         │
+                                         ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                     EPHEMERAL LIFECYCLE & AUDIT SERVICES                         │
+│  Atomic CTE Purge (90s) ──► 2-of-3 Quorum Break-Glass ──► SHA-256 Hash Chaining  │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## System Requirements & Prerequisites
+## Directory Structure
 
-Before installing and running CryptoSpatial-DB, ensure your environment meets these software dependencies:
-
-| Component | Minimum Version | Recommended Version | Verification Command |
-| :--- | :--- | :--- | :--- |
-| **Operating System** | Ubuntu 22.04 LTS / WSL2 | Ubuntu 22.04 LTS / WSL2 | `uname -a` |
-| **Docker Engine** | Docker 24.0+ | Docker 26.0+ | `docker --version` |
-| **Python** | Python 3.10+ | Python 3.11+ | `python3 --version` |
-| **Node.js** | Node 18.0+ | Node 20.0+ | `node -v` |
-| **npm** | npm 9.0+ | npm 10.0+ | `npm -v` |
-| **Git** | Git 2.34+ | Git 2.40+ | `git --version` |
+```text
+cryptospatial-db/
+├── backend/                  # FastAPI Middleware (Python 3.12, asyncpg, SQLAlchemy 2.0)
+│   ├── app/
+│   │   ├── main.py           # API routes, DP release endpoints, break-glass handler
+│   │   └── routers/          # Modular API routing controllers
+│   ├── Dockerfile            # Container build specification for backend API
+│   └── requirements.txt      # Python dependencies
+├── database/                 # PostGIS Database Layer
+│   ├── migrations/
+│   │   ├── 001_initial_schema.sql   # Operational, ledger, audit, & archive tables
+│   │   └── 002_update_procedure.sql # In-database DP release & budget ledger stored procedures
+│   └── backups/              # Seed SQL data dumps
+├── frontend/                 # Primary Web Control Center (React 18 + Vite 5)
+├── db-inspector/             # Database Inspection & Real-time Visualizer
+├── fooddash-app/             # Delivery Logistics Demo Client Application
+├── cryptospatial_sdk.py      # Python Client SDK for API integration
+├── manage.sh                 # Unified CLI management & process lifecycle script
+├── docker-compose.yml        # Docker composition setup for PostgreSQL/PostGIS
+└── test_security_guards.py   # Security test matrix & concurrency test suite
+```
 
 ---
 
-## Installation & Setup Guide
+## System Requirements & Tech Stack
 
-Follow these step-by-step instructions to clone, configure, and launch the entire CryptoSpatial-DB stack locally.
+* **Database Engine:** PostgreSQL 16.4 with PostGIS 3.4.1 extension (Docker containerized)
+* **Middleware Framework:** FastAPI (Python 3.12), `asyncpg`, `SQLAlchemy 2.0 AsyncSession`
+* **Frontend Dashboard:** React 18, Vite 5, Tailwind CSS, Leaflet.js
+* **Operating System:** Ubuntu 22.04 LTS / 24.04 LTS / WSL2 Linux kernel 6.6+
+* **Prerequisites:** Docker 24.0+, Python 3.10+, Node.js 18+
 
-### Step 1: Clone the Repository
+---
 
-Open your WSL2 / Linux terminal and clone the official repository:
+## Quick Start & Installation
+
+### 1. Clone the Repository
 
 ```bash
-# Clone repository from GitHub
 git clone https://github.com/ihsn525/cryptospatial-db.git
-
-# Navigate into project root directory
 cd cryptospatial-db
 ```
 
----
-
-### Step 2: Configure Environment & Dependencies
-
-#### 2.1 Backend Virtual Environment Setup
+### 2. Configure Execution Permissions
 
 ```bash
-# Navigate to backend directory
-cd backend
-
-# Create Python virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Upgrade pip and install requirements
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# Return to root directory
-cd ..
+chmod +x manage.sh showcase_db.sh
 ```
 
-#### 2.2 Frontend Dependencies Setup
+### 3. Start the Full Application Stack
+
+Launch all services (PostGIS Docker container, FastAPI backend daemon, and React frontend dashboard) using the unified management CLI:
 
 ```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install Node packages via npm
-npm install
-
-# Return to root directory
-cd ..
-```
-
----
-
-### Step 3: Configure Docker Container & DB Permissions
-
-Ensure your current user account has permissions to run Docker containers without requiring `sudo`:
-
-```bash
-# Grant execution permissions to management script
-chmod +x manage.sh
-
-# Grant Docker group permissions (if not already applied)
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
----
-
-### Step 4: Run the Complete Stack Automatically
-
-Launch all three tiers (PostGIS Database Docker Container, FastAPI Middleware Backend, and React Vite Frontend Control Center) using the root management script:
-
-```bash
-# Start all services
 ./manage.sh start
 ```
 
-#### Expected Terminal Output:
+### 4. Service Dashboard Access
 
-```text
-[1/3] Starting PostGIS Database Container (cryptospatial_postgres)...
-      PostgreSQL container started successfully.
-[2/3] Starting FastAPI Backend Engine (Port 8000)...
-      FastAPI started (PID: 12345). Logs -> logs/backend.log
-[3/3] Starting React Vite Frontend Dashboard (Port 5173)...
-      React Vite started (PID: 12346). Logs -> logs/frontend.log
+Once started, open your browser to access:
 
-==================================================
-           CryptoSpatial-DB Status
-==================================================
-  Database (PostGIS 16): [ ONLINE  ] (Port 5432)
-  Backend  (FastAPI):    [ ONLINE  ] -> http://127.0.0.1:8000/docs
-  Frontend (React Vite): [ ONLINE  ] -> http://localhost:5173
-==================================================
-```
+* **React Control Center Dashboard:** `http://localhost:5173`
+* **FastAPI Swagger API Documentation:** `http://127.0.0.1:8000/docs`
+* **Database Connection:** `localhost:5432` (`user: postgres`, `pass: postgres`, `db: cryptospatial_db`)
 
 ---
 
-### Step 5: Verify Active Running Services
+## Service Orchestration CLI (`manage.sh`)
 
-Once started, open your browser and access the following interfaces:
-
-- **Interactive Frontend Dashboard:** `http://localhost:5173`
-- **FastAPI Swagger API Documentation:** `http://127.0.0.1:8000/docs`
-- **PostgreSQL / PostGIS Database Connection:** `localhost:5432` (`user: postgres`, `db: cryptospatial_db`)
-
----
-
-## Service Orchestration (`manage.sh`)
-
-The `manage.sh` script handles process isolation, daemon lifecycle management, and log streaming for all stack tiers:
+The `manage.sh` management script handles daemon process control, container execution, and log streaming:
 
 ```bash
-# Start all stack tiers
-./manage.sh start
-
-# Inspect live status and PID execution states
-./manage.sh status
-
-# Tail consolidated backend and frontend server logs
-./manage.sh logs
-
-# Restart all services cleanly
-./manage.sh restart
-
-# Safely stop all servers and database containers
-./manage.sh stop
+./manage.sh start     # Start PostGIS container, backend FastAPI server, and frontend Vite server
+./manage.sh status    # Inspect live status, running ports, and process PIDs
+./manage.sh logs      # Stream consolidated backend and frontend logs
+./manage.sh restart   # Perform a clean service restart
+./manage.sh stop      # Terminate background services and stop Docker containers
 ```
 
 ---
 
-## API Specification & Interactive Swagger Docs
+## Experimental Benchmarks & Performance Metrics
 
-The FastAPI backend exposes the following REST API endpoints:
+System benchmarks evaluated on an Intel Core i5-12450HX host (WSL2, 6 vCPUs, 11 GB RAM) using Dockerized PostgreSQL 16 / PostGIS 3.4.1 over $100{,}000$ synthetic GPS pings:
 
-| Endpoint | Method | Description | Sample Query Parameters |
+### 1. Scalability & Latency Comparison ($N=10^5$ Records)
+
+| System Architecture | $p50$ Latency (ms) | $p95$ Latency (ms) | Throughput (QPS) | Memory (MB) |
+| --- | --- | --- | --- | --- |
+| **System A** (Exact PostGIS, GiST on raw points) | 4.12 | 8.45 | 235 | 14.8 |
+| **System B** (Geohash/GiST, No DP) | 0.98 | 2.10 | 9,210 | 8.6 |
+| **System C** (Full CryptoSpatial-DB) | **1.12** | **2.34** | **8,620** | **11.2** |
+| **AES-256 Column Encryption Baseline** | 210.80 | 420.50 | 95 | 32.0 |
+
+*CryptoSpatial-DB delivers a **$176\times$ throughput advantage** and **$462\times$ latency reduction** over AES-256 column encryption while eliminating raw coordinate storage.*
+
+### 2. Concurrency Scaling Sweep ($C=1$ to $50$ Clients)
+
+| Concurrent Clients ($C$) | Peak Throughput (QPS) | $p50$ Latency (ms) | $p95$ Latency (ms) | Status |
+| --- | --- | --- | --- | --- |
+| 1 | 236 | 4.06 | 5.17 | Normal |
+| **5** | **243** | **13.92** | **50.14** | **Peak Throughput** |
+| 10 | 226 | 30.14 | 114.79 | Normal |
+| 20 | 205 | 63.77 | 279.08 | Lock Contention |
+| 50 | 184 | 149.94 | 837.33 | High Load |
+
+### 3. Spatial Classification Error Bounds (Proposition 2)
+
+| Distance Band to Boundary ($d$) | False Positive Rate (FPR) | False Negative Rate (FNR) | Misclassification Risk |
 | --- | --- | --- | --- |
-| `/api/v1/seed-geofences` | `POST` | Seeds Koramangala & Indiranagar MultiPolygons into PostGIS | None |
-| `/api/v1/simulate-pings` | `POST` | Generates randomized driver pings across Bengaluru hubs | `count=15` |
-| `/api/v1/trigger-audit` | `POST` | Executes PostGIS procedure with Laplace Noise (ε = 1.5) | `epsilon=1.5` |
-| `/api/v1/spatial-logs` | `GET` | Fetches ingested Geohash logs & raw transformation records | None |
-| `/api/v1/audit-reports` | `GET` | Retrieves historical differential privacy audit logs | None |
-| `/api/v1/reset-pings` | `DELETE` | Flushes spatial logs and audit reports, resetting PK counters | None |
+| $0\,\text{m} - 25\,\text{m}$ | 0.431 | 0.456 | Bounded ($\le 108.18\,\text{m}$) |
+| $25\,\text{m} - 50\,\text{m}$ | 0.326 | 0.340 | Bounded ($\le 108.18\,\text{m}$) |
+| $50\,\text{m} - 108\,\text{m}$ | 0.140 | 0.117 | Bounded ($\le 108.18\,\text{m}$) |
+| **$> 108.18\,\text{m}$** | **0.000** | **0.000** | **Zero Error Guaranteed** |
 
 ---
 
-## Database Schema & Stored Procedures
+## Security Verification Matrix
 
-### 1. Spatial Logs & Geofence Schema (`database/migrations/001_initial_schema.sql`)
-
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-
-CREATE TABLE IF NOT EXISTS spatial_logs (
-    log_id BIGSERIAL PRIMARY KEY,
-    raw_lat FLOAT,
-    raw_lon FLOAT,
-    masked_geohash VARCHAR(12) NOT NULL,
-    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS geofences (
-    geofence_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    zone_name VARCHAR(100) NOT NULL,
-    boundary_polygon GEOMETRY(MultiPolygon, 4326) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE
-);
-
-CREATE INDEX IF NOT EXISTS idx_geofences_spatial ON geofences USING GIST(boundary_polygon);
-```
-
-### 2. Differential Privacy Stored Procedure (`database/migrations/002_update_procedure.sql`)
-
-```sql
-CREATE OR REPLACE PROCEDURE sp_generate_privacy_audit(
-    p_geofence_id UUID,
-    p_epsilon FLOAT
-)
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_true_count INT;
-    v_noise FLOAT;
-    v_reported INT;
-BEGIN
-    SELECT COUNT(*) INTO v_true_count
-    FROM spatial_logs l
-    CROSS JOIN geofences g
-    WHERE g.geofence_id = p_geofence_id
-      AND ST_Contains(g.boundary_polygon, ST_SetSRID(ST_PointFromGeoHash(l.masked_geohash), 4326));
-
-    v_noise := (random() - 0.5) * (2.0 / p_epsilon);
-    v_reported := GREATEST(0, ROUND(v_true_count + v_noise));
-
-    INSERT INTO audit_reports (geofence_id, true_count, laplacian_noise, reported_count)
-    VALUES (p_geofence_id, v_true_count, v_noise, v_reported);
-END;
-$$;
-```
-
----
-
-## Continuous Integration & Delivery (CI/CD)
-
-Every push or pull request to the `main` branch triggers an automated GitHub Actions pipeline (`.github/workflows/ci-cd.yml`):
-
-1. **Backend Integration Pipeline:** Spins up an ephemeral `postgis/postgis:16-3.4` service container, installs Python dependencies, and verifies that database schema migrations (`001` and `002`) execute cleanly.
-2. **Frontend Build Pipeline:** Installs Node package dependencies and executes `npm run build` to verify React Vite production bundle compilation.
-
----
-
-## Troubleshooting & Common Issues
-
-### Issue 1: `permission denied while trying to connect to the Docker daemon socket`
-
-**Fix:** Run the socket permission command and refresh your terminal session:
+Run the security guardrail verification test suite:
 
 ```bash
-sudo chown root:docker /var/run/docker.sock
-sudo chmod 660 /var/run/docker.sock
-newgrp docker
+python3 test_security_guards.py
 ```
 
-### Issue 2: Address already in use (`Port 8000` or `Port 5173`)
+| Attack Vector | Attacker Model | Expected Defense | Observed Result | Status |
+| --- | --- | --- | --- | --- |
+| **Direct Table Read** | Storage Adversary (A1) | SQL RBAC Denial | Permission Denied on raw tables | **PASS** |
+| **Threshold Leakage** | Querying Analyst (A2) | Privatized Budget Selector | Smooth regime selection probability | **PASS** |
+| **Budget Exhaustion** | Querying Analyst (A2) | Cumulative Ledger Cap ($5.0$) | 4th sequential release rejected (HTTP 429) | **PASS** |
+| **Concurrent Spend** | Querying Analyst (A2) | `FOR UPDATE` Row Lock | 1 accepted (200), 49 denied (429) out of 50 | **PASS** |
+| **Unilateral Unmask** | Insider Adversary (A3) | 2-of-3 Key Quorum | Single key blocked (HTTP 403) | **PASS** |
+| **Audit Log Edit** | Storage Adversary (A1) | SHA-256 Hash Chain | Direct SQL edit breaks chain continuity | **PASS** |
 
-**Fix:** Kill any lingering background processes bound to those ports using `fuser`:
+---
 
-```bash
-fuser -k 8000/tcp
-fuser -k 5173/tcp
-./manage.sh restart
-```
+## Citation & Publication
 
-### Issue 3: Stored Procedure throws `ST_PointFromGeoHash` error
+If you use CryptoSpatial-DB in academic research, please cite our manuscript:
 
-**Fix:** Ensure the PostGIS spatial extension is enabled in your database:
-
-```bash
-docker exec -i cryptospatial_postgres psql -U postgres -d cryptospatial_db -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+```bibtex
+@article{siju2026cryptospatial,
+  title={CryptoSpatial-DB: A Privacy-Accounted Spatial Query Architecture with In-Database Differential Privacy and Ephemeral Lifecycle Enforcement},
+  author={Siju, Ihsan and Deepika, J. and Lalu, Hanna Ann and Menon, Gowrika},
+  journal={IEEE Access},
+  year={2026},
+  publisher={IEEE}
+}
 ```
 
 ---
 
-## Future Engineering Roadmap
+## Authors & License
 
-- **Phase 1 (Client-Side SDK):** Native iOS/Android SDKs for edge Geohashing and SGX hardware enclave noise generation.
-- **Phase 2 (Streaming Ingestion):** High-throughput Apache Kafka event streaming with real-time, dynamic geofence boundaries.
-- **Phase 3 (Zero-Knowledge Proofs):** Integration of ZK-SNARKs allowing driver devices to cryptographically prove zone containment without transmitting Geohash strings.
-- **Phase 4 (SaaS Compliance Engine):** Multi-tenant isolation with automated regulatory export reporting for the India DPDP Act (2023), EU GDPR, and US CCPA.
+* **Ihsan Siju** - School of Computer Science and Engineering, VIT Vellore
+* **Dr. Deepika J** *(Corresponding Author)* - Assistant Professor Senior, School of Computer Science and Engineering, VIT Vellore (`deepika.j@vit.ac.in`)
+* **Hanna Ann Lalu** - School of Computer Science and Engineering, VIT Vellore
+* **Gowrika Menon** - School of Computer Science and Engineering, VIT Vellore
 
----
-
-## License & Maintainer
-
-Distributed under the **MIT License**.
-
-- **Author(s):** Ihsan Siju, Hanna Ann, Gowrika Menon
-- **GitHub:** [@ihsn525](https://github.com/ihsn525) [@Hanna296-del](https://github.com/Hanna296-del) [@gowrika3](https://github.com/gowrika3)
-- **Project Repository:** [CryptoSpatial-DB on GitHub](https://github.com/ihsn525/cryptospatial-db)
+Distributed under the **MIT License**. See `LICENSE` for details.

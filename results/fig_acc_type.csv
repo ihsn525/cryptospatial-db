@@ -1,0 +1,4 @@
+type,precision,recall
+Coarse Centroid,0.82,0.817
+Dilated Filter,0.625,1.0
+Eroded Filter,1.0,0.4

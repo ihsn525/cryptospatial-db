@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from app.security.hmac_engine import generate_attestation_token, verify_attestation_token
 
 # Import database session generator and models from your main/models module
 from main import get_db, SpatialLogModel
@@ -158,3 +159,13 @@ async def get_privacy_count(geofence_id: str, epsilon: float = 1.5, db: AsyncSes
         differential_privacy_epsilon=epsilon,
         applied_mechanism="2D Laplace Distribution"
     )
+
+@router.get("/attest")
+def get_attestation(driver_id: str, geofence_id: str):
+    token = generate_attestation_token(driver_id, geofence_id)
+    return {"status": "success", "token": token}
+
+@router.post("/verify-attestation")
+def verify_token(token: str, driver_id: str, geofence_id: str):
+    is_valid = verify_attestation_token(token, driver_id, geofence_id)
+    return {"valid": is_valid}

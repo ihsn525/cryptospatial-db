@@ -1,0 +1,5 @@
+config,latency_pct,qps_pct
+Full System C,22.6,-7.1
+w/o Budget Ledger,12.1,-3.5
+w/o Selector,14.2,-4.2
+w/o Audit Write,8.5,-2.1

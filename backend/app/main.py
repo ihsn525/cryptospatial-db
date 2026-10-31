@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import Column, String, BigInteger, DateTime, Float, Integer, Boolean, select, text, func
 from sqlalchemy.dialects.postgresql import UUID
+from app.security.hmac_engine import generate_attestation_token, verify_attestation_token
 
 # -----------------------------------------------------------------------------
 # ENVIRONMENT & SECRETS CONFIGURATION
@@ -571,6 +572,16 @@ app.include_router(inspector_router)
 # SDK MIDDLEWARE ROUTER (`/v1/sdk`)
 # -----------------------------------------------------------------------------
 sdk_router = APIRouter(prefix="/v1/sdk", tags=["CryptoSpatial SDK & Middleware"])
+
+@sdk_router.get("/attest")
+def get_attestation(driver_id: str, geofence_id: str):
+    token = generate_attestation_token(driver_id, geofence_id)
+    return {"status": "success", "token": token}
+
+@sdk_router.post("/verify-attestation")
+def verify_token(token: str, driver_id: str, geofence_id: str):
+    is_valid = verify_attestation_token(token, driver_id, geofence_id)
+    return {"valid": is_valid}
 
 @sdk_router.post("/keys/generate", response_model=ApiKeyGenerateResponse)
 async def generate_api_key(payload: ApiKeyGenerateRequest, db: AsyncSession = Depends(get_db)):
