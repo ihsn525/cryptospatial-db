@@ -172,6 +172,20 @@ System benchmarks evaluated on an Intel Core i5-12450HX host (WSL2, 6 vCPUs, 11 
 | $50\,\text{m} - 108\,\text{m}$ | 0.140 | 0.117 | Bounded ($\le 108.18\,\text{m}$) |
 | **$> 108.18\,\text{m}$** | **0.000** | **0.000** | **Zero Error Guaranteed** |
 
+## Dataset & Reproducibility
+
+The repository includes the synthetic GPS telemetry dataset representing location observations in the Vellore region ($12.96^\circ\text{N}$–$12.98^\circ\text{N}$, $79.13^\circ\text{E}$–$79.16^\circ\text{E}$), as described in Section VII-A of the IEEE Access manuscript.
+
+- **Baseline Dataset (100,000 records):** `data/dataset_100k.csv`
+- **Scalability Dataset (1,000,000 records):** `data/dataset_1m.csv`
+- **Dataset Generator Script:** `scripts/generate_dataset.py`
+
+### Regenerating Datasets
+To regenerate the datasets from scratch using fixed seed `42`:
+```bash
+python scripts/generate_dataset.py --records 100000 --output data/dataset_100k.csv --seed 42
+python scripts/generate_dataset.py --records 1000000 --output data/dataset_1m.csv --seed 42
+
 ---
 
 ## Security Verification Matrix
